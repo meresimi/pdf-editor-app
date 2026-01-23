@@ -32,6 +32,15 @@ jobs:
         log-accepted-android-sdk-licenses: true
         packages: 'tools platform-tools'
     
+    - name: Install Gradle 8.7
+      run: |
+        wget https://services.gradle.org/distributions/gradle-8.7-bin.zip
+        unzip -q gradle-8.7-bin.zip
+        sudo rm -rf /usr/share/gradle-9.3.0
+        sudo mv gradle-8.7 /usr/share/
+        sudo ln -sf /usr/share/gradle-8.7/bin/gradle /usr/bin/gradle
+        gradle --version
+    
     - name: Install Cordova
       run: npm install -g cordova
     
@@ -41,7 +50,7 @@ jobs:
     - name: Add Android platform
       run: cordova platform add android
     
-    - name: Create Gradle wrapper with compatible version
+    - name: Create Gradle wrapper
       run: |
         cd platforms/android
         gradle wrapper --gradle-version 8.7 --distribution-type bin
