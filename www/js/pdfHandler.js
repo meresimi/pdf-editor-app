@@ -1,66 +1,50 @@
-// PDF Handler using PDF.js
+// Configure PDF.js worker from CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
 class PDFHandler {
     constructor() {
         this.pdfDoc = null;
-        this.pdfBytes = null;
         this.currentPage = 1;
-        this.totalPages = 0;
-        this.scale = 1.5;
         this.canvas = document.getElementById('pdfCanvas');
         this.ctx = this.canvas.getContext('2d');
-        
-        // Configure PDF.js worker
-        if (typeof pdfjsLib !== 'undefined') {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
-        }
+        this.pdfBytes = null;
     }
-    
-    async loadPDF(file) {
+
+    async loadPDF(fileUri) {
         try {
-            // Read file as array buffer
+            console.log('Loading PDF from:', fileUri);
+            
+            // Read file using Cordova File plugin
+            const fileEntry = await this.resolveLocalFileSystemURL(fileUri);
+            const file = await this.getFile(fileEntry);
             const arrayBuffer = await this.readFileAsArrayBuffer(file);
+            
             this.pdfBytes = new Uint8Array(arrayBuffer);
             
-            // Load PDF document
+            // Load with PDF.js for viewing
             const loadingTask = pdfjsLib.getDocument({ data: this.pdfBytes });
             this.pdfDoc = await loadingTask.promise;
-            this.totalPages = this.pdfDoc.numPages;
             
-            // Render first page
+            console.log('PDF loaded successfully');
+            this.currentPage = 1;
             await this.renderPage(this.currentPage);
-            this.updatePageInfo();
             
             return true;
         } catch (error) {
             console.error('Error loading PDF:', error);
-            throw error;
+            alert('Error loading PDF: ' + error.message);
+            return false;
         }
     }
-    
-    readFileAsArrayBuffer(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = (e) => reject(e);
-            reader.readAsArrayBuffer(file);
-        });
-    }
-    
+
     async renderPage(pageNum) {
         try {
             const page = await this.pdfDoc.getPage(pageNum);
-            const viewport = page.getViewport({ scale: this.scale });
+            const viewport = page.getViewport({ scale: 1.5 });
             
-            // Set canvas dimensions
             this.canvas.width = viewport.width;
             this.canvas.height = viewport.height;
             
-            // Update annotation layer size
-            const annotationLayer = document.getElementById('annotationLayer');
-            annotationLayer.style.width = viewport.width + 'px';
-            annotationLayer.style.height = viewport.height + 'px';
-            
-            // Render page
             const renderContext = {
                 canvasContext: this.ctx,
                 viewport: viewport
@@ -68,50 +52,71 @@ class PDFHandler {
             
             await page.render(renderContext).promise;
             
-            return true;
+            document.getElementById('pageInfo').textContent = 
+                `Page ${pageNum} of ${this.pdfDoc.numPages}`;
         } catch (error) {
             console.error('Error rendering page:', error);
-            throw error;
+            alert('Error rendering page: ' + error.message);
         }
     }
-    
-    async nextPage() {
-        if (this.currentPage < this.totalPages) {
-            this.currentPage++;
-            await this.renderPage(this.currentPage);
-            this.updatePageInfo();
+
+    async savePDF(modifiedPdfBytes) {
+        try {
+            // Save to Downloads folder
+            const fileName = `edited_pdf_${Date.now()}.pdf`;
+            const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
+            
+            // Use Cordova File plugin to save
+            const dirEntry = await this.resolveLocalFileSystemURL(
+                cordova.file.externalDataDirectory
+            );
+            const fileEntry = await this.createFile(dirEntry, fileName);
+            await this.writeFile(fileEntry, blob);
+            
+            alert('PDF saved successfully to: ' + fileEntry.nativeURL);
+            return fileEntry.nativeURL;
+        } catch (error) {
+            console.error('Error saving PDF:', error);
+            alert('Error saving PDF: ' + error.message);
+            return null;
         }
     }
-    
-    async previousPage() {
-        if (this.currentPage > 1) {
-            this.currentPage--;
-            await this.renderPage(this.currentPage);
-            this.updatePageInfo();
-        }
+
+    // Helper methods for Cordova File plugin
+    resolveLocalFileSystemURL(url) {
+        return new Promise((resolve, reject) => {
+            window.resolveLocalFileSystemURL(url, resolve, reject);
+        });
     }
-    
-    async zoomIn() {
-        this.scale += 0.25;
-        await this.renderPage(this.currentPage);
-        this.updateZoomLevel();
+
+    getFile(fileEntry) {
+        return new Promise((resolve, reject) => {
+            fileEntry.file(resolve, reject);
+        });
     }
-    
-    async zoomOut() {
-        if (this.scale > 0.5) {
-            this.scale -= 0.25;
-            await this.renderPage(this.currentPage);
-            this.updateZoomLevel();
-        }
+
+    readFileAsArrayBuffer(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
     }
-    
-    updatePageInfo() {
-        document.getElementById('pageInfo').textContent = 
-            `Page ${this.currentPage} of ${this.totalPages}`;
+
+    createFile(dirEntry, fileName) {
+        return new Promise((resolve, reject) => {
+            dirEntry.getFile(fileName, { create: true, exclusive: false }, resolve, reject);
+        });
     }
-    
-    updateZoomLevel() {
-        document.getElementById('zoomLevel').textContent = 
-            Math.round(this.scale * 100) + '%';
+
+    writeFile(fileEntry, blob) {
+        return new Promise((resolve, reject) => {
+            fileEntry.createWriter((writer) => {
+                writer.onwriteend = resolve;
+                writer.onerror = reject;
+                writer.write(blob);
+            });
+        });
     }
 }
