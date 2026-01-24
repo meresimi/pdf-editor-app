@@ -15,18 +15,18 @@
 
     <div id="pdfViewer" style="display: none;">
         <div id="toolbar">
-            <button id="openFileBtn" class="btn">Open File</button>
-            <button id="prevPageBtn" class="btn">Previous</button>
+            <button id="openFileBtn" class="btn">Open</button>
+            <button id="prevPageBtn" class="btn">◀ Prev</button>
             <span id="pageInfo"></span>
-            <button id="nextPageBtn" class="btn">Next</button>
-            <button id="zoomOutBtn" class="btn">-</button>
+            <button id="nextPageBtn" class="btn">Next ▶</button>
+            <button id="zoomOutBtn" class="btn">−</button>
             <button id="zoomInBtn" class="btn">+</button>
-            <button id="saveBtn" class="btn">Save PDF</button>
+            <button id="saveBtn" class="btn">💾 Save</button>
         </div>
 
         <div id="mainContent">
             <div id="canvasContainer">
-                <div style="position: relative; display: inline-block;">
+                <div class="canvas-wrapper">
                     <canvas id="pdfCanvas"></canvas>
                     <div id="annotationLayer"></div>
                 </div>
@@ -34,11 +34,11 @@
 
             <div id="editorPanel" style="display: none;">
                 <h3>Editor Tools</h3>
-                <button id="addTextBtn" class="btn">Add Text</button>
-                <button id="addCheckBtn" class="btn">Add Checkbox</button>
-                <button id="clearBtn" class="btn">Clear All</button>
+                <button id="addTextBtn" class="btn">📝 Add Text</button>
+                <button id="addCheckBtn" class="btn">☑ Checkbox</button>
+                <button id="clearBtn" class="btn">🗑 Clear</button>
 
-                <div id="textInput" style="display: none;">
+                <div id="textInput">
                     <input type="text" id="textField" placeholder="Enter text">
                     <button id="addTextConfirm" class="btn">Add</button>
                     <button id="cancelText" class="btn">Cancel</button>
@@ -53,9 +53,8 @@
 
     <input type="file" id="fileInput" accept="application/pdf" style="display: none;">
 
-    <!-- Use CDN for PDF libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     
     <script type="text/javascript" src="cordova.js"></script>
     <script src="js/pdfHandler.js"></script>

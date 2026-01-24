@@ -1,10 +1,27 @@
-// Form Editor using pdf-lib
 class FormEditor {
     constructor() {
-        this.annotations = [];
+        this.annotationsByPage = {}; // Store annotations per page
+        this.currentPage = 1;
         this.isTextMode = false;
         this.currentTextPosition = null;
+        this.annotationLayer = null;
+    }
+
+    setPage(pageNum) {
+        this.currentPage = pageNum;
+        this.refreshAnnotationLayer();
+    }
+
+    refreshAnnotationLayer() {
         this.annotationLayer = document.getElementById('annotationLayer');
+        if (!this.annotationLayer) return;
+        
+        this.annotationLayer.innerHTML = '';
+        
+        const pageAnnotations = this.annotationsByPage[this.currentPage] || [];
+        pageAnnotations.forEach(annotation => {
+            this.renderAnnotation(annotation);
+        });
     }
 
     enableTextMode() {
@@ -42,10 +59,14 @@ class FormEditor {
             text: text,
             x: x,
             y: y,
+            page: this.currentPage,
             id: Date.now()
         };
 
-        this.annotations.push(annotation);
+        if (!this.annotationsByPage[this.currentPage]) {
+            this.annotationsByPage[this.currentPage] = [];
+        }
+        this.annotationsByPage[this.currentPage].push(annotation);
         this.renderAnnotation(annotation);
     }
 
@@ -59,10 +80,14 @@ class FormEditor {
             checked: false,
             x: x,
             y: y,
+            page: this.currentPage,
             id: Date.now()
         };
 
-        this.annotations.push(annotation);
+        if (!this.annotationsByPage[this.currentPage]) {
+            this.annotationsByPage[this.currentPage] = [];
+        }
+        this.annotationsByPage[this.currentPage].push(annotation);
         this.renderAnnotation(annotation);
     }
 
@@ -79,10 +104,7 @@ class FormEditor {
             element.contentEditable = true;
 
             element.addEventListener('blur', (e) => {
-                const annot = this.annotations.find(a => a.id === annotation.id);
-                if (annot) {
-                    annot.text = e.target.textContent.trim();
-                }
+                annotation.text = e.target.textContent.trim();
             });
         } else if (annotation.type === 'checkbox') {
             element.className += ' checkbox-annotation';
@@ -97,7 +119,6 @@ class FormEditor {
         }
 
         this.makeDraggable(element, annotation);
-
         this.annotationLayer.appendChild(element);
     }
 
@@ -150,51 +171,52 @@ class FormEditor {
         element.addEventListener('touchstart', startDrag);
     }
 
-    removeAnnotation(id) {
-        this.annotations = this.annotations.filter(a => a.id !== id);
-        const element = this.annotationLayer.querySelector(`[data-id="${id}"]`);
-        if (element) {
-            element.remove();
-        }
-    }
-
     clearAll() {
-        this.annotations = [];
-        this.annotationLayer.innerHTML = '';
+        if (confirm('Clear all annotations on ALL pages?')) {
+            this.annotationsByPage = {};
+            if (this.annotationLayer) {
+                this.annotationLayer.innerHTML = '';
+            }
+        }
     }
 
     async applyAnnotationsToPDF(pdfBytes) {
         try {
-            // Access pdf-lib from global scope
-            const { PDFDocument, rgb } = window['pdf-lib'];
+            const { PDFDocument, rgb } = window.PDFLib;
             
             const pdfDoc = await PDFDocument.load(pdfBytes);
             const pages = pdfDoc.getPages();
-            const firstPage = pages[0];
-            const { width, height } = firstPage.getSize();
 
-            const canvas = document.getElementById('pdfCanvas');
-            const scaleX = width / canvas.width;
-            const scaleY = height / canvas.height;
+            for (let pageNum in this.annotationsByPage) {
+                const pageIndex = parseInt(pageNum) - 1;
+                if (pageIndex < 0 || pageIndex >= pages.length) continue;
 
-            for (const annotation of this.annotations) {
-                const x = annotation.x * scaleX;
-                const y = height - (annotation.y * scaleY);
+                const page = pages[pageIndex];
+                const { width, height } = page.getSize();
+                const canvas = document.getElementById('pdfCanvas');
+                const scaleX = width / canvas.width;
+                const scaleY = height / canvas.height;
 
-                if (annotation.type === 'text') {
-                    firstPage.drawText(annotation.text, {
-                        x: x,
-                        y: y,
-                        size: 12,
-                        color: rgb(0, 0, 0)
-                    });
-                } else if (annotation.type === 'checkbox' && annotation.checked) {
-                    firstPage.drawText('✓', {
-                        x: x,
-                        y: y,
-                        size: 20,
-                        color: rgb(0, 0.5, 0)
-                    });
+                const annotations = this.annotationsByPage[pageNum];
+                for (const annotation of annotations) {
+                    const x = annotation.x * scaleX;
+                    const y = height - (annotation.y * scaleY);
+
+                    if (annotation.type === 'text') {
+                        page.drawText(annotation.text, {
+                            x: x,
+                            y: y,
+                            size: 12,
+                            color: rgb(0, 0, 0)
+                        });
+                    } else if (annotation.type === 'checkbox' && annotation.checked) {
+                        page.drawText('✓', {
+                            x: x,
+                            y: y,
+                            size: 20,
+                            color: rgb(0, 0.5, 0)
+                        });
+                    }
                 }
             }
 

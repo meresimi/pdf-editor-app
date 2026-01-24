@@ -6,10 +6,11 @@ let app = {
 };
 
 function onDeviceReady() {
-    console.log('Device is ready!');
+    console.log('Device ready');
 
     app.pdfHandler = new PDFHandler();
     app.formEditor = new FormEditor();
+    app.pdfHandler.setFormEditor(app.formEditor);
 
     setupEventListeners();
     hideLoading();
@@ -45,9 +46,7 @@ function setupEventListeners() {
     });
 
     document.getElementById('clearBtn').addEventListener('click', () => {
-        if (confirm('Clear all annotations?')) {
-            app.formEditor.clearAll();
-        }
+        app.formEditor.clearAll();
     });
 
     document.getElementById('addTextConfirm').addEventListener('click', () => {
@@ -99,7 +98,7 @@ function showPDFViewer() {
 }
 
 function showEditorPanel() {
-    document.getElementById('editorPanel').style.display = 'block';
+    document.getElementById('editorPanel').style.display = 'flex';
 }
 
 function savePDF() {
@@ -109,7 +108,6 @@ function savePDF() {
         const fileName = 'edited_' + Date.now() + '.pdf';
         const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
         
-        // Create download link
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
