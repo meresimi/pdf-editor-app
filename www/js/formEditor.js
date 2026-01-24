@@ -1,10 +1,17 @@
 class FormEditor {
     constructor() {
-        this.annotationsByPage = {}; // Store annotations per page
+        this.annotationsByPage = {};
         this.currentPage = 1;
         this.isTextMode = false;
         this.currentTextPosition = null;
         this.annotationLayer = null;
+        this.initialized = false;
+    }
+
+    initialize() {
+        this.annotationLayer = document.getElementById('annotationLayer');
+        this.initialized = true;
+        console.log('FormEditor initialized');
     }
 
     setPage(pageNum) {
@@ -13,8 +20,13 @@ class FormEditor {
     }
 
     refreshAnnotationLayer() {
+        if (!this.initialized) this.initialize();
+        
         this.annotationLayer = document.getElementById('annotationLayer');
-        if (!this.annotationLayer) return;
+        if (!this.annotationLayer) {
+            console.error('Annotation layer not found');
+            return;
+        }
         
         this.annotationLayer.innerHTML = '';
         
@@ -54,6 +66,8 @@ class FormEditor {
     }
 
     addTextAnnotation(text, x, y) {
+        if (!this.initialized) this.initialize();
+        
         const annotation = {
             type: 'text',
             text: text,
@@ -71,9 +85,17 @@ class FormEditor {
     }
 
     addCheckbox() {
+        if (!this.initialized) this.initialize();
+        
         const canvas = document.getElementById('pdfCanvas');
-        const x = canvas.width / 2;
-        const y = canvas.height / 2;
+        if (!canvas) {
+            alert('Please load a PDF first');
+            return;
+        }
+        
+        const rect = canvas.getBoundingClientRect();
+        const x = rect.width / 2;
+        const y = rect.height / 2;
 
         const annotation = {
             type: 'checkbox',
@@ -89,9 +111,16 @@ class FormEditor {
         }
         this.annotationsByPage[this.currentPage].push(annotation);
         this.renderAnnotation(annotation);
+        
+        console.log('Checkbox added at', x, y);
     }
 
     renderAnnotation(annotation) {
+        if (!this.annotationLayer) {
+            console.error('Cannot render - annotation layer not ready');
+            return;
+        }
+        
         const element = document.createElement('div');
         element.className = 'annotation-item';
         element.dataset.id = annotation.id;
@@ -182,10 +211,11 @@ class FormEditor {
 
     async applyAnnotationsToPDF(pdfBytes) {
         try {
-            const { PDFDocument, rgb } = window.PDFLib;
+            const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
             
             const pdfDoc = await PDFDocument.load(pdfBytes);
             const pages = pdfDoc.getPages();
+            const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
             for (let pageNum in this.annotationsByPage) {
                 const pageIndex = parseInt(pageNum) - 1;
@@ -205,14 +235,15 @@ class FormEditor {
                     if (annotation.type === 'text') {
                         page.drawText(annotation.text, {
                             x: x,
-                            y: y,
+                            y: y - 12,
                             size: 12,
+                            font: font,
                             color: rgb(0, 0, 0)
                         });
                     } else if (annotation.type === 'checkbox' && annotation.checked) {
                         page.drawText('✓', {
                             x: x,
-                            y: y,
+                            y: y - 16,
                             size: 20,
                             color: rgb(0, 0.5, 0)
                         });
@@ -228,3 +259,5 @@ class FormEditor {
         }
     }
 }
+
+console.log('formEditor.js loaded');
