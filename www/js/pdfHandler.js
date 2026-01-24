@@ -5,42 +5,51 @@ class PDFHandler {
     constructor() {
         this.pdfDoc = null;
         this.currentPage = 1;
+        this.scale = 1.5;
         this.canvas = document.getElementById('pdfCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.pdfBytes = null;
+        console.log('PDFHandler initialized');
     }
 
-    async loadPDF(fileUri) {
+    async loadPDF(file) {
         try {
-            console.log('Loading PDF from:', fileUri);
+            console.log('loadPDF called with:', file);
+            console.log('File type:', typeof file);
+            console.log('File name:', file.name);
+            console.log('File size:', file.size);
             
-            // Read file using Cordova File plugin
-            const fileEntry = await this.resolveLocalFileSystemURL(fileUri);
-            const file = await this.getFile(fileEntry);
-            const arrayBuffer = await this.readFileAsArrayBuffer(file);
+            // Read file as ArrayBuffer
+            console.log('Reading file as ArrayBuffer...');
+            const arrayBuffer = await file.arrayBuffer();
+            console.log('ArrayBuffer size:', arrayBuffer.byteLength);
             
             this.pdfBytes = new Uint8Array(arrayBuffer);
+            console.log('Converted to Uint8Array, length:', this.pdfBytes.length);
             
             // Load with PDF.js for viewing
+            console.log('Loading PDF with PDF.js...');
             const loadingTask = pdfjsLib.getDocument({ data: this.pdfBytes });
             this.pdfDoc = await loadingTask.promise;
             
-            console.log('PDF loaded successfully');
+            console.log('PDF loaded successfully. Pages:', this.pdfDoc.numPages);
             this.currentPage = 1;
             await this.renderPage(this.currentPage);
             
             return true;
         } catch (error) {
-            console.error('Error loading PDF:', error);
+            console.error('Error in loadPDF:', error);
+            console.error('Error stack:', error.stack);
             alert('Error loading PDF: ' + error.message);
-            return false;
+            throw error;
         }
     }
 
     async renderPage(pageNum) {
         try {
+            console.log('Rendering page:', pageNum);
             const page = await this.pdfDoc.getPage(pageNum);
-            const viewport = page.getViewport({ scale: 1.5 });
+            const viewport = page.getViewport({ scale: this.scale });
             
             this.canvas.width = viewport.width;
             this.canvas.height = viewport.height;
@@ -54,69 +63,38 @@ class PDFHandler {
             
             document.getElementById('pageInfo').textContent = 
                 `Page ${pageNum} of ${this.pdfDoc.numPages}`;
+            
+            console.log('Page rendered successfully:', pageNum);
         } catch (error) {
             console.error('Error rendering page:', error);
             alert('Error rendering page: ' + error.message);
+            throw error;
         }
     }
 
-    async savePDF(modifiedPdfBytes) {
-        try {
-            // Save to Downloads folder
-            const fileName = `edited_pdf_${Date.now()}.pdf`;
-            const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
-            
-            // Use Cordova File plugin to save
-            const dirEntry = await this.resolveLocalFileSystemURL(
-                cordova.file.externalDataDirectory
-            );
-            const fileEntry = await this.createFile(dirEntry, fileName);
-            await this.writeFile(fileEntry, blob);
-            
-            alert('PDF saved successfully to: ' + fileEntry.nativeURL);
-            return fileEntry.nativeURL;
-        } catch (error) {
-            console.error('Error saving PDF:', error);
-            alert('Error saving PDF: ' + error.message);
-            return null;
+    previousPage() {
+        if (this.currentPage > 1) {
+            this.currentPage--;
+            this.renderPage(this.currentPage);
         }
     }
 
-    // Helper methods for Cordova File plugin
-    resolveLocalFileSystemURL(url) {
-        return new Promise((resolve, reject) => {
-            window.resolveLocalFileSystemURL(url, resolve, reject);
-        });
+    nextPage() {
+        if (this.currentPage < this.pdfDoc.numPages) {
+            this.currentPage++;
+            this.renderPage(this.currentPage);
+        }
     }
 
-    getFile(fileEntry) {
-        return new Promise((resolve, reject) => {
-            fileEntry.file(resolve, reject);
-        });
+    zoomIn() {
+        this.scale += 0.25;
+        this.renderPage(this.currentPage);
     }
 
-    readFileAsArrayBuffer(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = reject;
-            reader.readAsArrayBuffer(file);
-        });
-    }
-
-    createFile(dirEntry, fileName) {
-        return new Promise((resolve, reject) => {
-            dirEntry.getFile(fileName, { create: true, exclusive: false }, resolve, reject);
-        });
-    }
-
-    writeFile(fileEntry, blob) {
-        return new Promise((resolve, reject) => {
-            fileEntry.createWriter((writer) => {
-                writer.onwriteend = resolve;
-                writer.onerror = reject;
-                writer.write(blob);
-            });
-        });
+    zoomOut() {
+        if (this.scale > 0.5) {
+            this.scale -= 0.25;
+            this.renderPage(this.currentPage);
+        }
     }
 }
