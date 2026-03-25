@@ -2,7 +2,6 @@
   "appId": "com.pdfeditor.app",
   "appName": "PDF Editor",
   "webDir": "dist",
-  "bundledWebRuntime": false,
   "android": {
     "buildOptions": {
       "keystorePath": "release.keystore",
