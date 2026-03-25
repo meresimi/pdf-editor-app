@@ -38,7 +38,10 @@ jobs:
       - name: Build web assets
         run: npm run build
 
-      # ── 6. Capacitor sync → Android ──────────────────────────────────────────
+      # ── 6. Add Android platform (non-interactive), then sync ─────────────────
+      - name: Add Android platform
+        run: npx cap add android --no-interactive
+
       - name: Capacitor sync Android
         run: npx cap sync android
 
@@ -87,6 +90,9 @@ jobs:
 
       - name: Build web assets
         run: npm run build
+
+      - name: Add Android platform
+        run: npx cap add android --no-interactive
 
       - name: Capacitor sync Android
         run: npx cap sync android
