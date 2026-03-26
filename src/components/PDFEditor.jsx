@@ -1,55 +1,74 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// THEME
+// ══════════════════════════════════════════════════════════════════════════════
+const THEMES = {
+  dark:{
+    bg:"#0e0e16",bgSub:"#12121b",bgCard:"#1e1e2e",bgDeep:"#16161f",
+    border:"#222232",borderSub:"#1a1a28",borderMid:"#2a2a3a",
+    text:"#e8e6f0",textMuted:"#555",textDim:"#888",
+    accent:"#e94560",toolBg:"#16161f",btnBg:"#0e0e16",isDark:true,
+  },
+  light:{
+    bg:"#f2f2f7",bgSub:"#ffffff",bgCard:"#ffffff",bgDeep:"#eaeaf2",
+    border:"#d0d0dc",borderSub:"#e4e4ee",borderMid:"#c8c8da",
+    text:"#1a1a2e",textMuted:"#9999aa",textDim:"#666677",
+    accent:"#e94560",toolBg:"#f0f0f5",btnBg:"#ffffff",isDark:false,
+  },
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 const RENDER_SCALE = 2;
-const ZOOM_MIN = 0.3;
-const ZOOM_MAX = 5.0;
+const ZOOM_MIN = 0.3, ZOOM_MAX = 5.0;
 const FONTS = ["Helvetica","Times New Roman","Courier New","Georgia","Verdana","Arial Black"];
 const COLORS = ["#000000","#1d4ed8","#dc2626","#16a34a","#d97706","#7c3aed","#db2777","#ffffff"];
 const STROKE_WIDTHS = [1,2,3,5,8];
 const HIGHLIGHT_COLORS = ["#FFF176","#A5F3FC","#BBF7D0","#FCA5A5","#DDD6FE"];
 const DRAG_TOOLS  = new Set(["circle","textbox","highlight","blackout","line","arrow","draw"]);
 const PLACE_TOOLS = new Set(["text","check","cross","date","sticky","image","sign","initials"]);
+const SVG_TYPES   = new Set(["draw","line","arrow","circle","highlight","blackout","sign","initials"]);
+const HTML_TYPES  = new Set(["text","check","cross","date","textbox","sticky","image"]);
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SVG ICONS
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// ICONS
+// ══════════════════════════════════════════════════════════════════════════════
 const I = {
-  Text:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M12 6v13M8 19h8"/></svg>,
-  EditText:  ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6h10M9 6v9M6 15h6"/><path d="M17 12l1.5 1.5L14 18H12v-2l5-4z" strokeWidth="1.5"/></svg>,
-  Sign:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 16c2-4 4-7 5-7s1 3 2 4 3-3 4-3 2 2 3 2"/><line x1="3" y1="20" x2="21" y2="20" strokeWidth="1.5"/></svg>,
-  Initials:  ()=><svg viewBox="0 0 24 24" fill="currentColor"><text x="3" y="16" fontSize="11" fontWeight="700" fontFamily="serif">JS</text><rect x="3" y="18" width="18" height="1.5" rx="1"/></svg>,
-  Erase:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20H7L3 16l10-10 7 7-3 4z"/><line x1="6" y1="14" x2="14" y2="6"/></svg>,
-  Check:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4,12 9,17 20,7"/></svg>,
-  Cross:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>,
-  Circle:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/></svg>,
-  TextBox:   ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M7 9h4M9 9v6M13 9h4M15 9v6" strokeWidth="1.5"/></svg>,
-  Date:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h2v2H8z M11 14h2v2h-2z M14 14h2v2h-2z" fill="currentColor" stroke="none"/></svg>,
-  Img:       ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>,
-  Blackout:  ()=><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg>,
-  Highlight: ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3l6 0 3 9H6L9 3z"/><rect x="7" y="12" width="10" height="4"/><line x1="9" y1="20" x2="15" y2="20" strokeWidth="3"/></svg>,
-  Draw:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3l4 4L7 21H3v-4L17 3z"/><line x1="14" y1="6" x2="18" y2="10"/></svg>,
-  Line:      ()=><svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="19" x2="19" y2="5"/></svg>,
-  Arrow:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="9,5 19,5 19,15"/></svg>,
-  Sticky:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3h14a1 1 0 0 1 1 1v12l-5 5H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><polyline points="15,3 15,16 20,16"/></svg>,
-  Menu:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
-  Cursor:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5l3 3L12 15H9v-3L18.5 2.5z"/></svg>,
-  Undo:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M3 13A9 9 0 1 0 6 6"/></svg>,
-  Redo:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M21 13A9 9 0 1 1 18 6"/></svg>,
-  Save:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>,
-  Open:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
-  Trash:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>,
-  Close:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-  ChevL:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15,18 9,12 15,6"/></svg>,
-  ChevR:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9,18 15,12 9,6"/></svg>,
-  Info:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8" strokeWidth="3"/><line x1="12" y1="12" x2="12" y2="16"/></svg>,
+  Text:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M12 6v13M8 19h8"/></svg>,
+  Sign:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 16c2-4 4-7 5-7s1 3 2 4 3-3 4-3 2 2 3 2"/><line x1="3" y1="20" x2="21" y2="20" strokeWidth="1.5"/></svg>,
+  Initials: ()=><svg viewBox="0 0 24 24" fill="currentColor"><text x="3" y="16" fontSize="11" fontWeight="700" fontFamily="serif">JS</text><rect x="3" y="18" width="18" height="1.5" rx="1"/></svg>,
+  Erase:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20H7L3 16l10-10 7 7-3 4z"/><line x1="6" y1="14" x2="14" y2="6"/></svg>,
+  Check:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4,12 9,17 20,7"/></svg>,
+  Cross:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>,
+  Circle:   ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/></svg>,
+  TextBox:  ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M7 9h4M9 9v6M13 9h4M15 9v6" strokeWidth="1.5"/></svg>,
+  Date:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h2v2H8z M11 14h2v2h-2z M14 14h2v2h-2z" fill="currentColor" stroke="none"/></svg>,
+  Img:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>,
+  Blackout: ()=><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg>,
+  Highlight:()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3l6 0 3 9H6L9 3z"/><rect x="7" y="12" width="10" height="4"/><line x1="9" y1="20" x2="15" y2="20" strokeWidth="3"/></svg>,
+  Draw:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3l4 4L7 21H3v-4L17 3z"/><line x1="14" y1="6" x2="18" y2="10"/></svg>,
+  Line:     ()=><svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="19" x2="19" y2="5"/></svg>,
+  Arrow:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="9,5 19,5 19,15"/></svg>,
+  Sticky:   ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3h14a1 1 0 0 1 1 1v12l-5 5H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><polyline points="15,3 15,16 20,16"/></svg>,
+  Menu:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
+  Undo:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M3 13A9 9 0 1 0 6 6"/></svg>,
+  Redo:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M21 13A9 9 0 1 1 18 6"/></svg>,
+  Save:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>,
+  Open:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+  Trash:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>,
+  Close:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  ChevL:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15,18 9,12 15,6"/></svg>,
+  ChevR:    ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9,18 15,12 9,6"/></svg>,
+  Info:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8" strokeWidth="3"/><line x1="12" y1="12" x2="12" y2="16"/></svg>,
+  Sun:      ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
+  Moon:     ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+  Cursor:   ()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5l3 3L12 15H9v-3L18.5 2.5z"/></svg>,
 };
 
 const TOOLS = [
   {id:"text",      label:"Text",      Ic:I.Text},
-  {id:"edittext",  label:"Edit text", Ic:I.EditText},
   {id:"sign",      label:"Sign",      Ic:I.Sign},
   {id:"initials",  label:"Initials",  Ic:I.Initials},
   {id:"erase",     label:"Erase",     Ic:I.Erase},
@@ -67,15 +86,14 @@ const TOOLS = [
   {id:"sticky",    label:"Sticky",    Ic:I.Sticky},
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // UTILITIES
-// ═══════════════════════════════════════════════════════════════════════════════
-function loadScript(src) {
+// ══════════════════════════════════════════════════════════════════════════════
+function loadScript(src){
   return new Promise((res,rej)=>{
     if(document.querySelector(`script[src="${src}"]`)){res();return;}
     const s=document.createElement("script");
-    s.src=src; s.onload=res; s.onerror=rej;
-    document.head.appendChild(s);
+    s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);
   });
 }
 let _id=0;
@@ -84,11 +102,11 @@ const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 const dist2=(t1,t2)=>Math.hypot(t2.clientX-t1.clientX,t2.clientY-t1.clientY);
 const mid2=(t1,t2)=>({x:(t1.clientX+t2.clientX)/2,y:(t1.clientY+t2.clientY)/2});
 const hexToRgb=hex=>[parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,parseInt(hex.slice(5,7),16)/255];
-const todayStr=()=>{const d=new Date();return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;};
+const todayStr=()=>{const d=new Date();return`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;};
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // SWIPE STRIP
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 function SwipeStrip({children,style}){
   const ref=useRef(null);
   const sx=useRef(0),sl=useRef(0),active=useRef(false);
@@ -106,180 +124,211 @@ function SwipeStrip({children,style}){
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // useHistory
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 function useHistory(initial){
   const [idx,setIdx]=useState(0);
   const stack=useRef([initial]);
   const state=stack.current[idx];
-  const canUndo=idx>0,canRedo=idx<stack.current.length-1;
-  const push =useCallback(next=>{stack.current=[...stack.current.slice(0,idx+1),next];setIdx(stack.current.length-1);},[idx]);
-  const undo =useCallback(()=>{if(canUndo)setIdx(i=>i-1);},[canUndo]);
-  const redo =useCallback(()=>{if(canRedo)setIdx(i=>i+1);},[canRedo]);
+  const canUndo=idx>0, canRedo=idx<stack.current.length-1;
+  const push=useCallback(next=>{stack.current=[...stack.current.slice(0,idx+1),next];setIdx(stack.current.length-1);},[idx]);
+  const undo=useCallback(()=>{if(canUndo)setIdx(i=>i-1);},[canUndo]);
+  const redo=useCallback(()=>{if(canRedo)setIdx(i=>i+1);},[canRedo]);
   const patch=useCallback(next=>{stack.current=[...stack.current.slice(0,idx),next,...stack.current.slice(idx+1)];},[idx]);
   return{state,push,patch,undo,redo,canUndo,canRedo};
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // SIGNATURE PAD MODAL
-// ═══════════════════════════════════════════════════════════════════════════════
-function SignaturePad({title,isInitials,onApply,onClose}){
+// ══════════════════════════════════════════════════════════════════════════════
+function SignaturePad({title,isInitials,onApply,onClose,T}){
   const canvasRef=useRef(null);
-  const isDown=useRef(false);
-  const paths=useRef([]);
-  const cur=useRef([]);
-
+  const isDown=useRef(false),paths=useRef([]),cur=useRef([]);
   const getXY=e=>{
-    const r=canvasRef.current.getBoundingClientRect();
-    const s=e.touches?e.touches[0]:e;
+    const r=canvasRef.current.getBoundingClientRect(),s=e.touches?e.touches[0]:e;
     return{x:(s.clientX-r.left)*(canvasRef.current.width/r.width),y:(s.clientY-r.top)*(canvasRef.current.height/r.height)};
   };
   const redraw=()=>{
     const cvs=canvasRef.current,ctx=cvs.getContext("2d");
     ctx.clearRect(0,0,cvs.width,cvs.height);
-    ctx.beginPath();ctx.strokeStyle="#e8e8e8";ctx.lineWidth=1;
+    ctx.beginPath();ctx.strokeStyle="#ccc";ctx.lineWidth=1;
     ctx.moveTo(cvs.width*0.1,cvs.height*0.78);ctx.lineTo(cvs.width*0.9,cvs.height*0.78);ctx.stroke();
-    ctx.strokeStyle="#111";ctx.lineWidth=isInitials?3:2;ctx.lineCap="round";ctx.lineJoin="round";
+    ctx.strokeStyle="#222";ctx.lineWidth=isInitials?3:2;ctx.lineCap="round";ctx.lineJoin="round";
     for(const p of [...paths.current,cur.current]){
       if(p.length<2)continue;
       ctx.beginPath();ctx.moveTo(p[0].x,p[0].y);
-      for(let i=1;i<p.length;i++)ctx.lineTo(p[i].x,p[i].y);
-      ctx.stroke();
+      for(let i=1;i<p.length;i++)ctx.lineTo(p[i].x,p[i].y);ctx.stroke();
     }
   };
   const down=e=>{e.preventDefault();isDown.current=true;cur.current=[getXY(e)];};
   const move=e=>{if(!isDown.current)return;e.preventDefault();cur.current.push(getXY(e));redraw();};
-  const up  =()=>{if(!isDown.current)return;isDown.current=false;if(cur.current.length>1)paths.current.push([...cur.current]);cur.current=[];redraw();};
-  const apply=()=>{if(paths.current.length===0)return;onApply(paths.current);};
+  const up=()=>{if(!isDown.current)return;isDown.current=false;if(cur.current.length>1)paths.current.push([...cur.current]);cur.current=[];redraw();};
   const W=isInitials?220:320,H=isInitials?110:150;
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.78)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#1a1a28",border:"1px solid #2a2a3a",borderRadius:16,padding:20,width:W+40,maxWidth:"92vw"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.bgCard,border:`1px solid ${T.borderMid}`,borderRadius:16,padding:20,width:W+40,maxWidth:"92vw"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <span style={{fontWeight:600,color:"#e8e6f0",fontSize:15,fontFamily:"'DM Sans',sans-serif"}}>{title}</span>
-          <button onClick={onClose} style={ST.iconBtn}><I.Close/></button>
+          <span style={{fontWeight:600,color:T.text,fontSize:15}}>{title}</span>
+          <button onClick={onClose} style={mkIB(T)}><I.Close/></button>
         </div>
-        <div style={{background:"#fff",borderRadius:8,overflow:"hidden",border:"1px solid #3a3a4a",touchAction:"none"}}>
+        <div style={{background:"#fff",borderRadius:8,overflow:"hidden",border:`1px solid ${T.borderMid}`,touchAction:"none"}}>
           <canvas ref={canvasRef} width={W*2} height={H*2}
             style={{width:W,height:H,display:"block",touchAction:"none"}}
             onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
             onTouchStart={down} onTouchMove={move} onTouchEnd={up}/>
         </div>
         <div style={{display:"flex",gap:8,marginTop:12}}>
-          <button onClick={()=>{paths.current=[];cur.current=[];redraw();}} style={{...ST.menuBtn,flex:1}}>Clear</button>
-          <button onClick={onClose} style={{...ST.menuBtn,flex:1}}>Cancel</button>
-          <button onClick={apply} style={{...ST.menuBtn,flex:2,background:"#e94560",color:"#fff",border:"none"}}>Apply</button>
+          <button onClick={()=>{paths.current=[];cur.current=[];redraw();}} style={mkMB(T,false,1)}>Clear</button>
+          <button onClick={onClose} style={mkMB(T,false,1)}>Cancel</button>
+          <button onClick={()=>{if(paths.current.length)onApply(paths.current);}} style={mkMB(T,true,2)}>Apply</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// STYLE HELPERS  (theme-aware)
+// ══════════════════════════════════════════════════════════════════════════════
+const mkIB=(T,extra={})=>({width:38,height:42,display:"flex",alignItems:"center",justifyContent:"center",
+  background:T.btnBg,border:`1px solid ${T.border}`,borderRadius:8,cursor:"pointer",color:T.textDim,flexShrink:0,padding:0,...extra});
+
+const mkMB=(T,accent=false,flex=0)=>({
+  ...(flex?{flex}:{}),background:accent?T.accent:T.bgCard,color:accent?"#fff":T.text,
+  border:accent?"none":`1px solid ${T.borderMid}`,borderRadius:8,padding:"8px 14px",fontSize:13,
+  cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:500,
+});
+
+const mkSB=(T)=>({
+  width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",
+  background:T.bgCard,border:`1px solid ${T.borderMid}`,borderRadius:6,
+  cursor:"pointer",color:T.text,fontSize:14,fontWeight:700,flexShrink:0,padding:0,
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // HAMBURGER MENU
-// ═══════════════════════════════════════════════════════════════════════════════
-function HamburgerMenu({onClose,onOpen,onSave,onUndo,onRedo,canUndo,canRedo,currentPage,totalPages,onPageChange,saving,hasPdf,onClearAll}){
+// ══════════════════════════════════════════════════════════════════════════════
+function HamburgerMenu({onClose,onOpen,onSave,onUndo,onRedo,canUndo,canRedo,currentPage,totalPages,onPageChange,saving,hasPdf,onClearAll,theme,onTheme,T}){
   const [pg,setPg]=useState(String(currentPage+1));
   useEffect(()=>setPg(String(currentPage+1)),[currentPage]);
   const goPage=()=>{const n=parseInt(pg,10)-1;if(!isNaN(n)&&n>=0&&n<totalPages){onPageChange(n);onClose();}};
+  const navB={width:34,height:34,background:T.bgCard,border:`1px solid ${T.borderMid}`,borderRadius:8,cursor:"pointer",color:T.accent,display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0};
   return(
     <div style={{position:"fixed",inset:0,zIndex:150}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()}
-        style={{position:"absolute",bottom:0,left:0,right:0,background:"#16161f",borderTop:"1px solid #2a2a3a",borderRadius:"20px 20px 0 0",padding:"8px 0 36px",maxHeight:"80vh",overflowY:"auto"}}>
-        <div style={{width:36,height:4,background:"#2a2a3a",borderRadius:2,margin:"0 auto 18px"}}/>
+        style={{position:"absolute",bottom:0,left:0,right:0,background:T.toolBg,borderTop:`1px solid ${T.borderMid}`,borderRadius:"20px 20px 0 0",padding:"8px 0 36px",maxHeight:"80vh",overflowY:"auto"}}>
+        <div style={{width:36,height:4,background:T.borderMid,borderRadius:2,margin:"0 auto 18px"}}/>
         <div style={{padding:"0 16px"}}>
-          <MSection label="FILE">
-            <MRow icon={<I.Open/>} label="Open PDF"                   onClick={()=>{onOpen();onClose();}}/>
-            <MRow icon={<I.Save/>} label={saving?"Saving…":"Save PDF"} onClick={()=>{if(!saving&&hasPdf){onSave();onClose();}}} disabled={!hasPdf||saving}/>
-          </MSection>
-          <MSection label="EDIT">
-            <MRow icon={<I.Undo/>}  label="Undo"                     onClick={()=>{onUndo();onClose();}} disabled={!canUndo}/>
-            <MRow icon={<I.Redo/>}  label="Redo"                     onClick={()=>{onRedo();onClose();}} disabled={!canRedo}/>
-            <MRow icon={<I.Trash/>} label="Clear all annotations" accent="#ff6b6b" onClick={()=>{onClearAll();onClose();}} disabled={!hasPdf}/>
-          </MSection>
+
+          <MS label="FILE" T={T}>
+            <MR icon={<I.Open/>} label="Open PDF" onClick={()=>{onOpen();onClose();}} T={T}/>
+            <MR icon={<I.Save/>} label={saving?"Saving…":"Save PDF"} onClick={()=>{if(!saving&&hasPdf){onSave();onClose();}}} disabled={!hasPdf||saving} T={T}/>
+          </MS>
+
+          <MS label="EDIT" T={T}>
+            <MR icon={<I.Undo/>} label="Undo" onClick={()=>{onUndo();onClose();}} disabled={!canUndo} T={T}/>
+            <MR icon={<I.Redo/>} label="Redo" onClick={()=>{onRedo();onClose();}} disabled={!canRedo} T={T}/>
+            <MR icon={<I.Trash/>} label="Clear all annotations" accent="#ff6b6b" onClick={()=>{onClearAll();onClose();}} disabled={!hasPdf} T={T}/>
+          </MS>
+
+          <MS label="APPEARANCE" T={T}>
+            <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+              <span style={{color:T.text,fontSize:14,flex:1,fontFamily:"'DM Sans',sans-serif"}}>Theme</span>
+              {["light","dark"].map(th=>(
+                <button key={th} onClick={()=>onTheme(th)}
+                  style={{display:"flex",alignItems:"center",gap:5,background:theme===th?T.accent:T.bgCard,
+                    color:theme===th?"#fff":T.text,border:theme===th?"none":`1px solid ${T.borderMid}`,
+                    borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:500}}>
+                  <span style={{width:13,height:13,display:"inline-flex"}}>{th==="light"?<I.Sun/>:<I.Moon/>}</span>
+                  {th.charAt(0).toUpperCase()+th.slice(1)}
+                </button>
+              ))}
+            </div>
+          </MS>
+
           {hasPdf&&totalPages>1&&(
-            <MSection label="PAGE NAVIGATION">
+            <MS label="PAGE NAVIGATION" T={T}>
               <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px"}}>
-                <button onClick={()=>onPageChange(Math.max(0,currentPage-1))} disabled={currentPage===0} style={ST.navBtn}><I.ChevL/></button>
+                <button onClick={()=>onPageChange(Math.max(0,currentPage-1))} disabled={currentPage===0} style={navB}><I.ChevL/></button>
                 <input value={pg} onChange={e=>setPg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&goPage()}
-                  style={{width:44,textAlign:"center",background:"#1e1e2e",border:"1px solid #2a2a3a",color:"#e8e6f0",borderRadius:6,padding:"6px 4px",fontSize:13}}/>
-                <span style={{color:"#555",fontSize:12}}>of {totalPages}</span>
-                <button onClick={goPage} style={{...ST.menuBtn,padding:"6px 12px",fontSize:12}}>Go</button>
-                <button onClick={()=>onPageChange(Math.min(totalPages-1,currentPage+1))} disabled={currentPage>=totalPages-1} style={ST.navBtn}><I.ChevR/></button>
+                  style={{width:44,textAlign:"center",background:T.bgCard,border:`1px solid ${T.borderMid}`,color:T.text,borderRadius:6,padding:"6px 4px",fontSize:13}}/>
+                <span style={{color:T.textMuted,fontSize:12}}>of {totalPages}</span>
+                <button onClick={goPage} style={mkMB(T)}>Go</button>
+                <button onClick={()=>onPageChange(Math.min(totalPages-1,currentPage+1))} disabled={currentPage>=totalPages-1} style={navB}><I.ChevR/></button>
               </div>
-            </MSection>
+            </MS>
           )}
-          <MSection label="ABOUT">
+
+          <MS label="ABOUT" T={T}>
             <div style={{padding:"12px 14px",display:"flex",gap:12,alignItems:"flex-start"}}>
-              <div style={{color:"#a78bfa",width:20,height:20,flexShrink:0,marginTop:2}}><I.Info/></div>
+              <div style={{color:T.accent,width:20,height:20,flexShrink:0,marginTop:2}}><I.Info/></div>
               <div>
-                <div style={{color:"#e8e6f0",fontSize:14,fontWeight:600,marginBottom:4}}>PDF Filler</div>
-                <div style={{color:"#555",fontSize:12,lineHeight:1.6}}>Annotate, sign and fill PDF forms. All processing is local — nothing leaves your device.</div>
+                <div style={{color:T.text,fontSize:14,fontWeight:600,marginBottom:4}}>PDF Filler</div>
+                <div style={{color:T.textMuted,fontSize:12,lineHeight:1.6}}>Annotate, sign and fill PDF forms. All processing is local — nothing leaves your device.</div>
               </div>
             </div>
-          </MSection>
+          </MS>
         </div>
       </div>
     </div>
   );
 }
-const MSection=({label,children})=>(
+
+const MS=({label,children,T})=>(
   <div style={{marginBottom:14}}>
-    <div style={{fontSize:10,color:"#444",letterSpacing:1.5,marginBottom:4,padding:"0 4px",fontFamily:"'DM Sans',sans-serif"}}>{label}</div>
-    <div style={{background:"#0e0e16",borderRadius:10,overflow:"hidden"}}>{children}</div>
+    <div style={{fontSize:10,color:T.textMuted,letterSpacing:1.5,marginBottom:4,padding:"0 4px",fontFamily:"'DM Sans',sans-serif"}}>{label}</div>
+    <div style={{background:T.bg,borderRadius:10,overflow:"hidden"}}>{children}</div>
   </div>
 );
-const MRow=({icon,label,onClick,disabled,accent})=>(
+const MR=({icon,label,onClick,disabled,accent,T})=>(
   <button onClick={disabled?undefined:onClick}
     style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:"none",border:"none",
-      padding:"13px 14px",cursor:disabled?"default":"pointer",opacity:disabled?0.3:1,borderBottom:"1px solid #1a1a28"}}>
-    <span style={{width:20,height:20,color:accent||"#a78bfa",flexShrink:0}}>{icon}</span>
-    <span style={{color:accent||"#e8e6f0",fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>{label}</span>
+      padding:"13px 14px",cursor:disabled?"default":"pointer",opacity:disabled?0.3:1,borderBottom:`1px solid ${T.borderSub}`}}>
+    <span style={{width:20,height:20,color:accent||T.accent,flexShrink:0}}>{icon}</span>
+    <span style={{color:accent||T.text,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>{label}</span>
   </button>
 );
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // TOOL SETTINGS BAR
-// ═══════════════════════════════════════════════════════════════════════════════
-function ToolSettingsBar({activeTool,settings,onSettings,color,onColor,strokeWidth,onStrokeWidth,highlightColor,onHighlightColor}){
+// ══════════════════════════════════════════════════════════════════════════════
+function ToolSettingsBar({activeTool,settings,onSettings,color,onColor,strokeWidth,onStrokeWidth,highlightColor,onHighlightColor,T}){
   if(!activeTool)return null;
-  const needsColor  =["text","check","cross","date","sign","initials","draw","line","arrow","circle","textbox","sticky"].includes(activeTool);
-  const needsStroke =["draw","line","arrow","circle"].includes(activeTool);
-  const needsFont   =["text","textbox","date","sticky"].includes(activeTool);
-  const needsHL     =activeTool==="highlight";
+  const needsColor=["text","check","cross","date","sign","initials","draw","line","arrow","circle","textbox","sticky"].includes(activeTool);
+  const needsStroke=["draw","line","arrow","circle"].includes(activeTool);
+  const needsFont=["text","textbox","date","sticky"].includes(activeTool);
+  const needsHL=activeTool==="highlight";
   if(!needsColor&&!needsStroke&&!needsFont&&!needsHL)return null;
+  const sel={background:T.bgCard,color:T.text,border:`1px solid ${T.borderMid}`,borderRadius:6,padding:"4px 7px",fontSize:11,cursor:"pointer",flexShrink:0};
   return(
-    <div style={{background:"#0e0e16",borderTop:"1px solid #1a1a28",padding:"5px 12px",display:"flex",alignItems:"center",gap:6,overflowX:"auto",scrollbarWidth:"none",flexShrink:0}}>
+    <div style={{background:T.bgSub,borderTop:`1px solid ${T.borderSub}`,padding:"5px 12px",display:"flex",alignItems:"center",gap:6,overflowX:"auto",scrollbarWidth:"none",flexShrink:0}}>
       {needsHL&&HIGHLIGHT_COLORS.map(c=>(
         <div key={c} onClick={()=>onHighlightColor(c)}
           style={{width:22,height:22,borderRadius:4,background:c,cursor:"pointer",flexShrink:0,border:highlightColor===c?"2px solid #e94560":"2px solid transparent",opacity:0.9}}/>
       ))}
       {needsColor&&COLORS.map(c=>(
         <div key={c} onClick={()=>onColor(c)}
-          style={{width:20,height:20,borderRadius:4,background:c,cursor:"pointer",flexShrink:0,border:color===c?"2px solid #e94560":c==="#ffffff"?"2px solid #333":"2px solid transparent"}}/>
+          style={{width:20,height:20,borderRadius:4,background:c,cursor:"pointer",flexShrink:0,border:color===c?"2px solid #e94560":c==="#ffffff"?"2px solid #aaa":"2px solid transparent"}}/>
       ))}
-      {needsColor&&(
-        <input type="color" value={color} onChange={e=>onColor(e.target.value)}
-          style={{width:22,height:22,border:"none",background:"none",cursor:"pointer",padding:0,flexShrink:0}}/>
-      )}
+      {needsColor&&<input type="color" value={color} onChange={e=>onColor(e.target.value)} style={{width:22,height:22,border:"none",background:"none",cursor:"pointer",padding:0,flexShrink:0}}/>}
       {needsStroke&&(
         <div style={{display:"flex",gap:4,alignItems:"center",paddingLeft:4}}>
-          <span style={{fontSize:10,color:"#444",whiteSpace:"nowrap"}}>W</span>
+          <span style={{fontSize:10,color:T.textMuted,whiteSpace:"nowrap"}}>W</span>
           {STROKE_WIDTHS.map(w=>(
             <button key={w} onClick={()=>onStrokeWidth(w)}
-              style={{width:22,height:22,borderRadius:4,border:strokeWidth===w?"2px solid #e94560":"1px solid #2a2a3a",background:"#1e1e2e",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
-              <div style={{width:Math.min(w*3,14),height:w,background:"#e8e6f0",borderRadius:2}}/>
+              style={{width:22,height:22,borderRadius:4,border:strokeWidth===w?"2px solid #e94560":`1px solid ${T.borderMid}`,background:T.bgCard,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
+              <div style={{width:Math.min(w*3,14),height:w,background:T.text,borderRadius:2}}/>
             </button>
           ))}
         </div>
       )}
       {needsFont&&(
         <>
-          <select value={settings.fontSize} onChange={e=>onSettings({...settings,fontSize:parseInt(e.target.value)})} style={ST.sel}>
+          <select value={settings.fontSize} onChange={e=>onSettings({...settings,fontSize:parseInt(e.target.value)})} style={sel}>
             {[8,10,12,14,16,18,20,24,28,32,40,48].map(s=><option key={s} value={s}>{s}pt</option>)}
           </select>
-          <select value={settings.fontFamily} onChange={e=>onSettings({...settings,fontFamily:e.target.value})} style={ST.sel}>
+          <select value={settings.fontFamily} onChange={e=>onSettings({...settings,fontFamily:e.target.value})} style={sel}>
             {FONTS.map(f=><option key={f}>{f}</option>)}
           </select>
         </>
@@ -288,9 +337,103 @@ function ToolSettingsBar({activeTool,settings,onSettings,color,onColor,strokeWid
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SVG SHAPES
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// SELECTED OBJECT CONTROLS BAR
+// ══════════════════════════════════════════════════════════════════════════════
+function ObjectBar({ann,onUpdate,onDelete,T}){
+  if(!ann)return null;
+  const isTextType=["text","date","textbox"].includes(ann.type);
+  const hasFontSize=["text","date","check","cross","textbox"].includes(ann.type);
+  const isImage=ann.type==="image";
+  const isStroke=["draw","line","arrow","circle"].includes(ann.type);
+  const hasColor=!["blackout","sticky"].includes(ann.type);
+  const hasBg=["text","textbox","date"].includes(ann.type);
+  const upd=p=>onUpdate({...ann,...p});
+  const sb=mkSB(T);
+  const activeStyle=(on)=>on?{...sb,background:T.accent,color:"#fff",border:"none"}:sb;
+
+  return(
+    <div style={{background:T.bgSub,borderTop:`1px solid ${T.border}`,padding:"5px 10px",
+      display:"flex",alignItems:"center",gap:5,overflowX:"auto",scrollbarWidth:"none",flexShrink:0,minHeight:46}}>
+
+      <span style={{fontSize:9,color:T.accent,fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",flexShrink:0,minWidth:40,fontFamily:"'DM Sans',sans-serif"}}>
+        {ann.type}
+      </span>
+
+      {/* SIZE +/- */}
+      {(hasFontSize||isImage||isStroke)&&<>
+        <button style={sb} onClick={()=>{
+          if(hasFontSize) upd({size:Math.max(6,(ann.size||14)-2)});
+          else if(isImage) upd({w:Math.max(20,ann.w*0.87),h:Math.max(20,ann.h*0.87)});
+          else if(isStroke)upd({strokeWidth:Math.max(1,(ann.strokeWidth||2)-1)});
+        }}>−</button>
+        <span style={{fontSize:10,color:T.textDim,flexShrink:0,minWidth:28,textAlign:"center",fontFamily:"monospace"}}>
+          {hasFontSize?`${ann.size||14}`:isStroke?`${ann.strokeWidth||2}`:"sz"}
+        </span>
+        <button style={sb} onClick={()=>{
+          if(hasFontSize) upd({size:Math.min(96,(ann.size||14)+2)});
+          else if(isImage) upd({w:ann.w*1.15,h:ann.h*1.15});
+          else if(isStroke)upd({strokeWidth:Math.min(20,(ann.strokeWidth||2)+1)});
+        }}>+</button>
+      </>}
+
+      {/* BOLD / ITALIC */}
+      {isTextType&&<>
+        <button style={activeStyle(ann.bold)} onClick={()=>upd({bold:!ann.bold})}>B</button>
+        <button style={{...activeStyle(ann.italic),fontStyle:"italic"}}>
+          <span onClick={()=>upd({italic:!ann.italic})}>I</span>
+        </button>
+      </>}
+
+      {/* FONT FAMILY */}
+      {isTextType&&(
+        <select value={ann.font||"Helvetica"} onChange={e=>upd({font:e.target.value})}
+          style={{background:T.bgCard,color:T.text,border:`1px solid ${T.borderMid}`,borderRadius:6,
+            padding:"3px 4px",fontSize:10,flexShrink:0,maxWidth:80,cursor:"pointer"}}>
+          {FONTS.map(f=><option key={f} value={f}>{f.split(" ")[0]}</option>)}
+        </select>
+      )}
+
+      {/* COLOR */}
+      {hasColor&&(
+        <div title="Color" style={{position:"relative",flexShrink:0}}>
+          <div style={{width:26,height:26,borderRadius:5,background:ann.color||"#000",border:`2px solid ${T.borderMid}`,overflow:"hidden",position:"relative",cursor:"pointer"}}>
+            <input type="color" value={ann.color||"#000000"} onChange={e=>upd({color:e.target.value})}
+              style={{position:"absolute",inset:"-4px",opacity:0,cursor:"pointer",width:"200%",height:"200%"}}/>
+          </div>
+        </div>
+      )}
+
+      {/* BACKGROUND COLOR */}
+      {hasBg&&(
+        <div title="Background" style={{position:"relative",flexShrink:0}}>
+          <div style={{width:26,height:26,borderRadius:5,cursor:"pointer",overflow:"hidden",position:"relative",
+            background:ann.bg&&ann.bg!=="transparent"?ann.bg:"repeating-linear-gradient(45deg,#ccc 0,#ccc 2px,transparent 2px,transparent 6px)",
+            border:`2px dashed ${T.borderMid}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {(!ann.bg||ann.bg==="transparent")&&<span style={{fontSize:7,color:T.textMuted,fontWeight:700,pointerEvents:"none"}}>BG</span>}
+            <input type="color" value={ann.bg&&ann.bg!=="transparent"?ann.bg:"#ffffff"} onChange={e=>upd({bg:e.target.value})}
+              style={{position:"absolute",inset:"-4px",opacity:0,cursor:"pointer",width:"200%",height:"200%"}}/>
+          </div>
+          {ann.bg&&ann.bg!=="transparent"&&(
+            <button onClick={()=>upd({bg:"transparent"})}
+              style={{position:"absolute",top:-5,right:-5,width:13,height:13,borderRadius:"50%",background:"#e94560",border:"none",color:"#fff",fontSize:8,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>×</button>
+          )}
+        </div>
+      )}
+
+      <div style={{flex:1}}/>
+
+      <button onClick={()=>onDelete(ann.id)}
+        style={{...sb,color:"#e94560",border:"1px solid rgba(233,69,96,0.3)"}}>
+        <div style={{width:14,height:14}}><I.Trash/></div>
+      </button>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ARROW SVG helper
+// ══════════════════════════════════════════════════════════════════════════════
 function ArrowSVG({x0,y0,x1,y1,color,strokeWidth}){
   const dx=x1-x0,dy=y1-y0,len=Math.hypot(dx,dy);
   if(len<2)return null;
@@ -304,32 +447,82 @@ function ArrowSVG({x0,y0,x1,y1,color,strokeWidth}){
   );
 }
 
-function renderSVGAnnot(a,selected,onSelect,onDelete,activeTool){
-  const sel=selected===a.id;
-  const handleClick=e=>{
+// ══════════════════════════════════════════════════════════════════════════════
+// SVG ANNOTATION COMPONENT — with full drag support
+// ══════════════════════════════════════════════════════════════════════════════
+function SVGAnnotComp({a,selected,activeTool,zoomRef,stageRef,annotationsRef,onSelect,onDelete,onUpdate,historyPush,historyPatch}){
+  const drag=useRef(null);
+  const [isDrag,setIsDrag]=useState(false);
+
+  useEffect(()=>{
+    const move=e=>{
+      if(!drag.current)return;
+      const src=e.touches?e.touches[0]:e;
+      const er=stageRef.current?.getBoundingClientRect();if(!er)return;
+      const cx=(src.clientX-er.left)/zoomRef.current;
+      const cy=(src.clientY-er.top)/zoomRef.current;
+      const dx=cx-drag.current.lastX,dy=cy-drag.current.lastY;
+      drag.current.lastX=cx;drag.current.lastY=cy;
+      const next=annotationsRef.current.map(ann=>{
+        if(ann.id!==a.id)return ann;
+        if(ann.type==="draw"||ann.type==="sign"||ann.type==="initials")
+          return{...ann,x:(ann.x||0)+dx,y:(ann.y||0)+dy};
+        return{...ann,x0:ann.x0+dx,y0:ann.y0+dy,x1:ann.x1+dx,y1:ann.y1+dy};
+      });
+      annotationsRef.current=next;historyPatch(next);onUpdate(next);
+    };
+    const up=()=>{
+      if(!drag.current)return;
+      setIsDrag(false);historyPush(annotationsRef.current);drag.current=null;
+    };
+    window.addEventListener("pointermove",move);
+    window.addEventListener("pointerup",up);
+    window.addEventListener("touchmove",move,{passive:true});
+    window.addEventListener("touchend",up);
+    return()=>{
+      window.removeEventListener("pointermove",move);
+      window.removeEventListener("pointerup",up);
+      window.removeEventListener("touchmove",move);
+      window.removeEventListener("touchend",up);
+    };
+  },[a.id]); // eslint-disable-line
+
+  const onDown=e=>{
     e.stopPropagation();
     if(activeTool==="erase"){onDelete(a.id);return;}
     onSelect(a.id);
+    if(!activeTool){
+      const src=e.touches?e.touches[0]:e;
+      const er=stageRef.current?.getBoundingClientRect();if(!er)return;
+      drag.current={lastX:(src.clientX-er.left)/zoomRef.current,lastY:(src.clientY-er.top)/zoomRef.current};
+      setIsDrag(true);
+    }
   };
+
+  const sel=selected===a.id;
+  const cursor=activeTool==="erase"?"not-allowed":isDrag?"grabbing":"grab";
+  const commonEvts={onMouseDown:onDown,onTouchStart:onDown,style:{cursor}};
+  const op=isDrag?0.7:1;
+
   switch(a.type){
     case "draw":return(
-      <g key={a.id} onClick={handleClick} style={{cursor:activeTool==="erase"?"not-allowed":"pointer"}}>
+      <g {...commonEvts} opacity={op}>
         {a.paths.map((p,i)=>(
-          <polyline key={i} points={p.map(pt=>`${pt.x},${pt.y}`).join(" ")}
+          <polyline key={i} points={p.map(pt=>`${pt.x+(a.x||0)},${pt.y+(a.y||0)}`).join(" ")}
             stroke={a.color} fill="none" strokeWidth={a.strokeWidth} strokeLinecap="round" strokeLinejoin="round"/>
         ))}
-        {sel&&a.paths[0]?.[0]&&<circle cx={a.paths[0][0].x} cy={a.paths[0][0].y} r={6} fill="#e94560" stroke="#fff" strokeWidth={1.5}/>}
+        {sel&&a.paths[0]?.[0]&&<circle cx={a.paths[0][0].x+(a.x||0)} cy={a.paths[0][0].y+(a.y||0)} r={6} fill="#e94560" stroke="#fff" strokeWidth={1.5}/>}
       </g>
     );
     case "line":return(
-      <g key={a.id} onClick={handleClick} style={{cursor:activeTool==="erase"?"not-allowed":"pointer"}}>
+      <g {...commonEvts} opacity={op}>
         <line x1={a.x0} y1={a.y0} x2={a.x1} y2={a.y1} stroke="transparent" strokeWidth={Math.max(a.strokeWidth,14)}/>
         <line x1={a.x0} y1={a.y0} x2={a.x1} y2={a.y1} stroke={a.color} strokeWidth={a.strokeWidth} strokeLinecap="round"/>
         {sel&&<><circle cx={a.x0} cy={a.y0} r={6} fill="#e94560" stroke="#fff" strokeWidth={1.5}/><circle cx={a.x1} cy={a.y1} r={6} fill="#e94560" stroke="#fff" strokeWidth={1.5}/></>}
       </g>
     );
     case "arrow":return(
-      <g key={a.id} onClick={handleClick} style={{cursor:activeTool==="erase"?"not-allowed":"pointer"}}>
+      <g {...commonEvts} opacity={op}>
         <line x1={a.x0} y1={a.y0} x2={a.x1} y2={a.y1} stroke="transparent" strokeWidth={Math.max(a.strokeWidth,14)}/>
         <ArrowSVG {...a}/>
         {sel&&<circle cx={a.x0} cy={a.y0} r={6} fill="#e94560" stroke="#fff" strokeWidth={1.5}/>}
@@ -338,7 +531,7 @@ function renderSVGAnnot(a,selected,onSelect,onDelete,activeTool){
     case "circle":{
       const cx=(a.x0+a.x1)/2,cy=(a.y0+a.y1)/2,rx=Math.abs(a.x1-a.x0)/2,ry=Math.abs(a.y1-a.y0)/2;
       return(
-        <g key={a.id} onClick={handleClick} style={{cursor:activeTool==="erase"?"not-allowed":"pointer"}}>
+        <g {...commonEvts} opacity={op}>
           <ellipse cx={cx} cy={cy} rx={rx+10} ry={ry+10} fill="transparent"/>
           <ellipse cx={cx} cy={cy} rx={rx} ry={ry} stroke={a.color} strokeWidth={a.strokeWidth} fill="none"/>
           {sel&&<ellipse cx={cx} cy={cy} rx={rx} ry={ry} stroke="#e94560" strokeWidth={2} fill="none" strokeDasharray="6 3"/>}
@@ -348,7 +541,7 @@ function renderSVGAnnot(a,selected,onSelect,onDelete,activeTool){
     case "highlight":{
       const x=Math.min(a.x0,a.x1),y=Math.min(a.y0,a.y1),w=Math.abs(a.x1-a.x0),h=Math.abs(a.y1-a.y0);
       return(
-        <g key={a.id} onClick={handleClick} style={{cursor:activeTool==="erase"?"not-allowed":"pointer"}}>
+        <g {...commonEvts} opacity={op}>
           <rect x={x} y={y} width={w} height={h} fill={a.color||"#FFF176"} opacity={0.45}/>
           {sel&&<rect x={x} y={y} width={w} height={h} fill="none" stroke="#e94560" strokeWidth={2} strokeDasharray="6 3"/>}
         </g>
@@ -357,17 +550,15 @@ function renderSVGAnnot(a,selected,onSelect,onDelete,activeTool){
     case "blackout":{
       const x=Math.min(a.x0,a.x1),y=Math.min(a.y0,a.y1),w=Math.abs(a.x1-a.x0),h=Math.abs(a.y1-a.y0);
       return(
-        <g key={a.id} onClick={handleClick} style={{cursor:activeTool==="erase"?"not-allowed":"pointer"}}>
+        <g {...commonEvts} opacity={op}>
           <rect x={x} y={y} width={w} height={h} fill="#000"/>
           {sel&&<rect x={x} y={y} width={w} height={h} fill="none" stroke="#e94560" strokeWidth={2} strokeDasharray="6 3"/>}
         </g>
       );
     }
     case "sign":case "initials":return(
-      <g key={a.id} transform={`translate(${a.x},${a.y})`} onClick={handleClick}
-        style={{cursor:activeTool==="erase"?"not-allowed":"pointer"}}>
-        {sel&&<rect x={-4} y={-4} width={(a.bw||80)+8} height={(a.bh||40)+8}
-          fill="rgba(233,69,96,0.08)" stroke="#e94560" strokeWidth={1.5} strokeDasharray="5 3" rx={3}/>}
+      <g {...commonEvts} transform={`translate(${a.x||0},${a.y||0})`} opacity={op}>
+        {sel&&<rect x={-4} y={-4} width={(a.bw||80)+8} height={(a.bh||40)+8} fill="rgba(233,69,96,0.08)" stroke="#e94560" strokeWidth={1.5} strokeDasharray="5 3" rx={3}/>}
         {a.paths.map((p,i)=>(
           <polyline key={i} points={p.map(pt=>`${pt.x},${pt.y}`).join(" ")}
             stroke={a.color||"#000"} fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
@@ -378,6 +569,9 @@ function renderSVGAnnot(a,selected,onSelect,onDelete,activeTool){
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// LIVE DRAWING PREVIEW
+// ══════════════════════════════════════════════════════════════════════════════
 function LivePreview({drawing,color,strokeWidth,highlightColor}){
   if(!drawing)return null;
   const{type,x0,y0,x1,y1,points}=drawing;
@@ -394,86 +588,150 @@ function LivePreview({drawing,color,strokeWidth,highlightColor}){
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // DRAGGABLE HTML ANNOTATION
-// ═══════════════════════════════════════════════════════════════════════════════
-function DraggableAnnot({ann,selected,activeTool,zoomRef,panRef,stageRef,annotationsRef,onSelect,onUpdate,onDelete,historyPush,historyPatch}){
-  const dragging=useRef(null);
+// ══════════════════════════════════════════════════════════════════════════════
+function DraggableAnnot({ann,selected,activeTool,zoomRef,stageRef,annotationsRef,onSelect,onUpdate,onDelete,historyPush,historyPatch,autoEdit,onAutoEditDone}){
+  const drag=useRef(null);
   const [editing,setEditing]=useState(false);
+  const [isDrag,setIsDrag]=useState(false);
   const inputRef=useRef(null);
-  useEffect(()=>{if(editing&&inputRef.current)inputRef.current.focus();},[editing]);
 
-  const startDrag=(clientX,clientY)=>{
-    const er=stageRef.current?.getBoundingClientRect();if(!er)return;
-    dragging.current={offX:clientX-er.left-ann.x*zoomRef.current,offY:clientY-er.top-ann.y*zoomRef.current};
-  };
-  const onDown=e=>{
-    e.stopPropagation();
-    if(activeTool==="erase"){onDelete(ann.id);return;}
-    if(activeTool==="edittext"){if(["text","textbox","sticky","date"].includes(ann.type))setEditing(true);return;}
-    onSelect(ann.id);
-    if(!activeTool){const s=e.touches?e.touches[0]:e;startDrag(s.clientX,s.clientY);}
-  };
-
+  // auto-enter edit mode when just placed
   useEffect(()=>{
-    if(!dragging.current)return;
+    if(autoEdit){setEditing(true);onAutoEditDone();}
+  },[autoEdit]); // eslint-disable-line
+
+  useEffect(()=>{if(editing&&inputRef.current){inputRef.current.focus();inputRef.current.select();}},[ editing]);
+
+  // Always-on drag listeners — check drag.current inside
+  useEffect(()=>{
     const move=e=>{
-      const s=e.touches?e.touches[0]:e;
+      if(!drag.current)return;
+      const src=e.touches?e.touches[0]:e;
       const er=stageRef.current?.getBoundingClientRect();if(!er)return;
-      const x=(s.clientX-er.left-dragging.current.offX)/zoomRef.current;
-      const y=(s.clientY-er.top -dragging.current.offY)/zoomRef.current;
+      const x=(src.clientX-er.left-drag.current.offX)/zoomRef.current;
+      const y=(src.clientY-er.top -drag.current.offY)/zoomRef.current;
       const next=annotationsRef.current.map(a=>a.id===ann.id?{...a,x,y}:a);
       annotationsRef.current=next;historyPatch(next);onUpdate(next);
     };
-    const up=()=>{historyPush(annotationsRef.current);dragging.current=null;};
-    window.addEventListener("mousemove",move);window.addEventListener("mouseup",up);
-    window.addEventListener("touchmove",move,{passive:true});window.addEventListener("touchend",up);
-    return()=>{window.removeEventListener("mousemove",move);window.removeEventListener("mouseup",up);window.removeEventListener("touchmove",move);window.removeEventListener("touchend",up);};
+    const up=()=>{
+      if(!drag.current)return;
+      setIsDrag(false);historyPush(annotationsRef.current);drag.current=null;
+    };
+    window.addEventListener("pointermove",move);
+    window.addEventListener("pointerup",up);
+    window.addEventListener("touchmove",move,{passive:true});
+    window.addEventListener("touchend",up);
+    return()=>{
+      window.removeEventListener("pointermove",move);
+      window.removeEventListener("pointerup",up);
+      window.removeEventListener("touchmove",move);
+      window.removeEventListener("touchend",up);
+    };
   },[ann.id]); // eslint-disable-line
+
+  const onDown=e=>{
+    e.stopPropagation();
+    if(activeTool==="erase"){onDelete(ann.id);return;}
+    const wasSelected=selected===ann.id;
+    onSelect(ann.id);
+    if(!activeTool){
+      // second tap on selected text → edit
+      if(wasSelected&&["text","textbox","sticky","date"].includes(ann.type)&&!["check","cross"].includes(ann.type)){
+        setEditing(true);return;
+      }
+      const src=e.touches?e.touches[0]:e;
+      const er=stageRef.current?.getBoundingClientRect();if(!er)return;
+      drag.current={offX:src.clientX-er.left-ann.x*zoomRef.current,offY:src.clientY-er.top-ann.y*zoomRef.current};
+      setIsDrag(true);
+    }
+  };
 
   const sel=selected===ann.id;
   const RS=RENDER_SCALE;
-  const base={position:"absolute",left:ann.x,top:ann.y,border:sel?"1.5px dashed #e94560":"1.5px dashed transparent",borderRadius:3,padding:"2px 4px",background:sel?"rgba(233,69,96,0.06)":"transparent",cursor:activeTool==="erase"?"not-allowed":activeTool==="edittext"?"text":"move",userSelect:"none",touchAction:"none",zIndex:sel?20:10};
+  const base={
+    position:"absolute",left:ann.x,top:ann.y,
+    border:sel?"1.5px dashed #e94560":"1.5px dashed transparent",
+    borderRadius:3,padding:"2px 4px",
+    background:sel?"rgba(233,69,96,0.06)":"transparent",
+    cursor:activeTool==="erase"?"not-allowed":isDrag?"grabbing":"move",
+    userSelect:"none",touchAction:"none",zIndex:sel?20:10,
+    opacity:isDrag?0.7:1,
+    boxShadow:isDrag?"0 8px 24px rgba(0,0,0,0.4)":"none",
+    transition:"opacity 0.1s,box-shadow 0.1s",
+  };
 
-  const editArea=(key,valKey,extraStyle={})=>(
-    <textarea ref={inputRef} value={ann[valKey]||""}
-      onChange={e=>{const next=annotationsRef.current.map(a=>a.id===ann.id?{...a,[valKey]:e.target.value}:a);annotationsRef.current=next;onUpdate(next);}}
+  const editArea=(valKey,extraStyle={})=>(
+    <textarea ref={inputRef}
+      value={ann[valKey]||""}
+      placeholder={valKey==="text"?"Type here…":""}
+      onChange={e=>{
+        const next=annotationsRef.current.map(a=>a.id===ann.id?{...a,[valKey]:e.target.value}:a);
+        annotationsRef.current=next;onUpdate(next);
+      }}
       onBlur={()=>{setEditing(false);historyPush(annotationsRef.current);}}
       onKeyDown={e=>{if(e.key==="Escape")setEditing(false);e.stopPropagation();}}
-      style={{background:"rgba(233,69,96,0.08)",border:"1.5px solid #e94560",borderRadius:3,padding:"2px 4px",resize:"none",outline:"none",...extraStyle}}/>
+      style={{background:"rgba(233,69,96,0.08)",border:"1.5px solid #e94560",borderRadius:3,
+        padding:"2px 4px",resize:"none",outline:"none",...extraStyle}}/>
   );
+
+  const bgStyle=ann.bg&&ann.bg!=="transparent"?{background:ann.bg}:{};
 
   if(ann.type==="text"||ann.type==="date"||ann.type==="check"||ann.type==="cross"){
     const sym=ann.type==="check"||ann.type==="cross";
+    const displayText=ann.text||(sym?"":"");
+    const placeholder=!displayText&&!sym;
     return(
-      <div style={{...base,fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",fontWeight:ann.bold?"bold":"normal",fontStyle:ann.italic?"italic":"normal",color:ann.color,whiteSpace:"pre",lineHeight:1.2,minWidth:20}}
-        onMouseDown={onDown} onTouchStart={onDown} onDoubleClick={()=>{if(!sym)setEditing(true);}}>
-        {editing&&!sym?editArea("text","text",{fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color,minWidth:100,minHeight:ann.size*RS+10}):ann.text}
+      <div style={{...base,...bgStyle,fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",
+        fontWeight:ann.bold?"bold":"normal",fontStyle:ann.italic?"italic":"normal",
+        color:ann.color,whiteSpace:"pre",lineHeight:1.2,minWidth:20}}
+        onMouseDown={onDown} onTouchStart={onDown}>
+        {editing&&!sym
+          ? editArea("text",{fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color,minWidth:100,minHeight:ann.size*RS+10})
+          : placeholder
+            ? <span style={{color:"#aaa",fontStyle:"italic",fontSize:ann.size*RS}}>Tap to type…</span>
+            : displayText
+        }
       </div>
     );
   }
   if(ann.type==="textbox"){
     return(
-      <div style={{...base,width:ann.w,minHeight:ann.h,border:sel?"1.5px solid #e94560":`1.5px solid ${ann.color||"#000"}`,background:"rgba(255,255,255,0.03)",padding:6}}
-        onMouseDown={onDown} onTouchStart={onDown} onDoubleClick={()=>setEditing(true)}>
-        {editing?editArea("text","text",{width:"100%",minHeight:ann.h-12,fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color,border:"none",padding:0}):
-          <span style={{fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color||"#000",whiteSpace:"pre-wrap"}}>{ann.text||<span style={{color:"#666",fontStyle:"italic",fontSize:24}}>Double-tap to edit</span>}</span>}
+      <div style={{...base,...bgStyle,width:ann.w,minHeight:ann.h,
+        border:sel?"1.5px solid #e94560":`1.5px solid ${ann.color||"#000"}`,
+        background:bgStyle.background||"rgba(255,255,255,0.03)",padding:6}}
+        onMouseDown={onDown} onTouchStart={onDown}>
+        {editing
+          ? editArea("text",{width:"100%",minHeight:ann.h-12,fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color,border:"none",padding:0})
+          : <span style={{fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color||"#000",
+              fontWeight:ann.bold?"bold":"normal",fontStyle:ann.italic?"italic":"normal",whiteSpace:"pre-wrap"}}>
+              {ann.text||<span style={{color:"#888",fontStyle:"italic",fontSize:18}}>Tap to type…</span>}
+            </span>
+        }
       </div>
     );
   }
   if(ann.type==="sticky"){
     return(
-      <div style={{...base,width:ann.w,minHeight:ann.h,background:sel?"#FFF9C4":"#FFFDE7",border:sel?"1.5px solid #e94560":"1.5px solid #F9A825",borderRadius:6,boxShadow:"2px 3px 10px rgba(0,0,0,0.5)",padding:10}}
-        onMouseDown={onDown} onTouchStart={onDown} onDoubleClick={()=>setEditing(true)}>
-        <div style={{fontSize:11,color:"#F57F17",fontFamily:"'DM Sans',sans-serif",marginBottom:5,fontWeight:700}}>NOTE</div>
-        {editing?editArea("text","text",{width:"100%",minHeight:60,background:"transparent",border:"none",color:"#333",fontSize:13,fontFamily:"'DM Sans',sans-serif"}):
-          <div style={{fontSize:13,color:"#333",fontFamily:"'DM Sans',sans-serif",whiteSpace:"pre-wrap"}}>{ann.text||<span style={{color:"#aaa",fontStyle:"italic"}}>Double-tap to edit</span>}</div>}
+      <div style={{...base,width:ann.w,minHeight:ann.h,background:sel?"#FFF9C4":"#FFFDE7",
+        border:sel?"1.5px solid #e94560":"1.5px solid #F9A825",borderRadius:6,
+        boxShadow:"2px 3px 10px rgba(0,0,0,0.35)",padding:10}}
+        onMouseDown={onDown} onTouchStart={onDown}>
+        <div style={{fontSize:11,color:"#F57F17",marginBottom:5,fontWeight:700}}>NOTE</div>
+        {editing
+          ? editArea("text",{width:"100%",minHeight:60,background:"transparent",border:"none",color:"#333",fontSize:13})
+          : <div style={{fontSize:13,color:"#333",whiteSpace:"pre-wrap"}}>
+              {ann.text||<span style={{color:"#bbb",fontStyle:"italic"}}>Tap to type…</span>}
+            </div>
+        }
       </div>
     );
   }
   if(ann.type==="image"){
     return(
-      <div style={{...base,width:ann.w,height:ann.h,padding:0,overflow:"hidden",borderRadius:2}} onMouseDown={onDown} onTouchStart={onDown}>
+      <div style={{...base,width:ann.w,height:ann.h,padding:0,overflow:"hidden",borderRadius:2}}
+        onMouseDown={onDown} onTouchStart={onDown}>
         <img src={ann.dataUrl} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",pointerEvents:"none"}}/>
       </div>
     );
@@ -481,57 +739,61 @@ function DraggableAnnot({ann,selected,activeTool,zoomRef,panRef,stageRef,annotat
   return null;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // MAIN
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 export default function PDFEditor(){
-  const [pdfDoc,     setPdfDoc]     = useState(null);
-  const [pdfBytes,   setPdfBytes]   = useState(null);
-  const [pageImages, setPageImages] = useState([]);
-  const [curPage,    setCurPage]    = useState(0);
-  const [libsReady,  setLibsReady]  = useState(false);
-  const [loading,    setLoading]    = useState(false);
-  const [saving,     setSaving]     = useState(false);
-  const [fileName,   setFileName]   = useState("document.pdf");
+  const [pdfDoc,setPdfDoc]=useState(null);
+  const [pdfBytes,setPdfBytes]=useState(null);
+  const [pageImages,setPageImages]=useState([]);
+  const [curPage,setCurPage]=useState(0);
+  const [libsReady,setLibsReady]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [fileName,setFileName]=useState("document.pdf");
 
-  const [activeTool, setActiveTool] = useState(null);
-  const [selected,   setSelected]   = useState(null);
-  const [showMenu,   setShowMenu]   = useState(false);
-  const [signMode,   setSignMode]   = useState(null);
-  const [pendingImg, setPendingImg] = useState(null);
+  const [activeTool,setActiveTool]=useState(null);
+  const [selected,setSelected]=useState(null);
+  const [showMenu,setShowMenu]=useState(false);
+  const [signMode,setSignMode]=useState(null);
+  const [pendingImg,setPendingImg]=useState(null);
+  const [autoEditId,setAutoEditId]=useState(null);   // id of annotation to auto-enter edit
 
-  const [color,          setColor]          = useState("#000000");
-  const [strokeWidth,    setStrokeWidth]    = useState(2);
-  const [highlightColor, setHighlightColor] = useState("#FFF176");
-  const [toolSettings,   setToolSettings]   = useState({fontSize:16,fontFamily:"Helvetica"});
+  const [theme,setTheme]=useState("dark");
+  const T=THEMES[theme];
 
-  const history = useHistory([]);
-  const annotations = history.state;
-  const annRef = useRef(annotations);
+  const [color,setColor]=useState("#000000");
+  const [strokeWidth,setStrokeWidth]=useState(2);
+  const [highlightColor,setHighlightColor]=useState("#FFF176");
+  const [toolSettings,setToolSettings]=useState({fontSize:16,fontFamily:"Helvetica"});
+
+  const history=useHistory([]);
+  const annotations=history.state;
+  const annRef=useRef(annotations);
   useEffect(()=>{annRef.current=annotations;},[annotations]);
 
-  const setAnns = useCallback((next,addHist=true)=>{
+  const setAnns=useCallback((next,addHist=true)=>{
     const val=typeof next==="function"?next(annRef.current):next;
     annRef.current=val;
     if(addHist)history.push(val);else history.patch(val);
   },[history]);
 
-  const [drawing, setDrawing] = useState(null);
-  const drawingRef = useRef(null);
+  const [drawing,setDrawing]=useState(null);
+  const drawingRef=useRef(null);
   useEffect(()=>{drawingRef.current=drawing;},[drawing]);
 
   const [zoom,setZoom]=useState(1);
-  const [pan, setPan] =useState({x:0,y:0});
+  const [pan,setPan]=useState({x:0,y:0});
   const zoomRef=useRef(1);
-  const panRef =useRef({x:0,y:0});
+  const panRef=useRef({x:0,y:0});
   useEffect(()=>{zoomRef.current=zoom;},[zoom]);
   useEffect(()=>{panRef.current=pan;},[pan]);
 
-  const vpRef    = useRef(null);
-  const stageRef = useRef(null);
-  const fileRef  = useRef(null);
-  const imgRef   = useRef(null);
-  const gesture  = useRef({type:"none",prevDist:0,prevMid:{x:0,y:0},panStart:{x:0,y:0},panOrigin:{x:0,y:0}});
+  const vpRef=useRef(null);
+  const stageRef=useRef(null);
+  const fileRef=useRef(null);
+  const imgRef=useRef(null);
+  const gesture=useRef({type:"none",prevDist:0,prevMid:{x:0,y:0},panStart:{x:0,y:0},panOrigin:{x:0,y:0}});
 
   // ── libs ──────────────────────────────────────────────────────────────────
   useEffect(()=>{
@@ -584,8 +846,8 @@ export default function PDFEditor(){
   // ── viewport touch ────────────────────────────────────────────────────────
   const onVpTS=useCallback(e=>{
     if(drawingRef.current)return;
-    if(e.touches.length===1) gesture.current={...gesture.current,type:"pan",panStart:{x:e.touches[0].clientX,y:e.touches[0].clientY},panOrigin:{...panRef.current}};
-    else if(e.touches.length===2) gesture.current={...gesture.current,type:"pinch",prevDist:dist2(e.touches[0],e.touches[1]),prevMid:mid2(e.touches[0],e.touches[1])};
+    if(e.touches.length===1)gesture.current={...gesture.current,type:"pan",panStart:{x:e.touches[0].clientX,y:e.touches[0].clientY},panOrigin:{...panRef.current}};
+    else if(e.touches.length===2)gesture.current={...gesture.current,type:"pinch",prevDist:dist2(e.touches[0],e.touches[1]),prevMid:mid2(e.touches[0],e.touches[1])};
   },[]);
 
   const onVpTM=useCallback(e=>{
@@ -607,7 +869,7 @@ export default function PDFEditor(){
 
   const onVpTE=useCallback(e=>{
     if(e.touches.length<2){
-      if(gesture.current.type==="pinch"&&e.touches.length===1) gesture.current={...gesture.current,type:"pan",panStart:{x:e.touches[0].clientX,y:e.touches[0].clientY},panOrigin:{...panRef.current}};
+      if(gesture.current.type==="pinch"&&e.touches.length===1)gesture.current={...gesture.current,type:"pan",panStart:{x:e.touches[0].clientX,y:e.touches[0].clientY},panOrigin:{...panRef.current}};
       else gesture.current.type="none";
     }
   },[]);
@@ -615,8 +877,8 @@ export default function PDFEditor(){
   useEffect(()=>{
     const el=vpRef.current;if(!el)return;
     el.addEventListener("touchstart",onVpTS,{passive:true});
-    el.addEventListener("touchmove", onVpTM,{passive:false});
-    el.addEventListener("touchend",  onVpTE,{passive:true});
+    el.addEventListener("touchmove",onVpTM,{passive:false});
+    el.addEventListener("touchend",onVpTE,{passive:true});
     return()=>{el.removeEventListener("touchstart",onVpTS);el.removeEventListener("touchmove",onVpTM);el.removeEventListener("touchend",onVpTE);};
   },[onVpTS,onVpTM,onVpTE]);
 
@@ -635,14 +897,20 @@ export default function PDFEditor(){
   // ── stage pointer down ────────────────────────────────────────────────────
   const onStagePD=useCallback(e=>{
     if(!activeTool||!pageImages[curPage])return;
-    if(activeTool==="erase"||activeTool==="edittext")return;
+    if(activeTool==="erase")return;
     const{x,y}=getPageXY(e);
     const pg=curPage;
     if(PLACE_TOOLS.has(activeTool)){
-      if(activeTool==="text")       setAnns(p=>[...p,{id:uid(),page:pg,type:"text",x,y,text:"Text",font:toolSettings.fontFamily,size:toolSettings.fontSize,bold:false,italic:false,color}]);
+      if(activeTool==="text"){
+        const id=uid();
+        setAnns(p=>[...p,{id,page:pg,type:"text",x,y,text:"",font:toolSettings.fontFamily,size:toolSettings.fontSize,bold:false,italic:false,color,bg:"transparent"}]);
+        setSelected(id);
+        setAutoEditId(id);
+        setActiveTool(null);
+      }
       else if(activeTool==="check") setAnns(p=>[...p,{id:uid(),page:pg,type:"check",x,y,text:"✓",font:"Helvetica",size:24,bold:true,italic:false,color}]);
       else if(activeTool==="cross") setAnns(p=>[...p,{id:uid(),page:pg,type:"cross",x,y,text:"✕",font:"Helvetica",size:24,bold:true,italic:false,color}]);
-      else if(activeTool==="date")  setAnns(p=>[...p,{id:uid(),page:pg,type:"date",x,y,text:todayStr(),font:toolSettings.fontFamily,size:toolSettings.fontSize,bold:false,italic:false,color}]);
+      else if(activeTool==="date")  setAnns(p=>[...p,{id:uid(),page:pg,type:"date",x,y,text:todayStr(),font:toolSettings.fontFamily,size:toolSettings.fontSize,bold:false,italic:false,color,bg:"transparent"}]);
       else if(activeTool==="sticky")setAnns(p=>[...p,{id:uid(),page:pg,type:"sticky",x,y,text:"",w:200,h:120}]);
       else if(activeTool==="sign")  {setSignMode({type:"sign",x,y});return;}
       else if(activeTool==="initials"){setSignMode({type:"initials",x,y});return;}
@@ -668,13 +936,17 @@ export default function PDFEditor(){
     if(!drawingRef.current)return;
     const d=drawingRef.current,pg=curPage;
     const commit=ann=>setAnns(p=>[...p,ann]);
-    if(d.type==="draw"&&d.points.length>1)commit({id:uid(),page:pg,type:"draw",paths:[d.points],color,strokeWidth});
+    if(d.type==="draw"&&d.points.length>1)commit({id:uid(),page:pg,type:"draw",x:0,y:0,paths:[d.points],color,strokeWidth});
     else if(d.type==="line"&&Math.hypot(d.x1-d.x0,d.y1-d.y0)>5)commit({id:uid(),page:pg,type:"line",x0:d.x0,y0:d.y0,x1:d.x1,y1:d.y1,color,strokeWidth});
     else if(d.type==="arrow"&&Math.hypot(d.x1-d.x0,d.y1-d.y0)>5)commit({id:uid(),page:pg,type:"arrow",x0:d.x0,y0:d.y0,x1:d.x1,y1:d.y1,color,strokeWidth});
     else if(d.type==="circle"&&(Math.abs(d.x1-d.x0)>5||Math.abs(d.y1-d.y0)>5))commit({id:uid(),page:pg,type:"circle",x0:d.x0,y0:d.y0,x1:d.x1,y1:d.y1,color,strokeWidth});
     else if(d.type==="highlight"&&(Math.abs(d.x1-d.x0)>5||Math.abs(d.y1-d.y0)>5))commit({id:uid(),page:pg,type:"highlight",x0:d.x0,y0:d.y0,x1:d.x1,y1:d.y1,color:highlightColor});
     else if(d.type==="blackout"&&(Math.abs(d.x1-d.x0)>5||Math.abs(d.y1-d.y0)>5))commit({id:uid(),page:pg,type:"blackout",x0:d.x0,y0:d.y0,x1:d.x1,y1:d.y1});
-    else if(d.type==="textbox"&&(Math.abs(d.x1-d.x0)>20||Math.abs(d.y1-d.y0)>20))commit({id:uid(),page:pg,type:"textbox",x:Math.min(d.x0,d.x1),y:Math.min(d.y0,d.y1),w:Math.abs(d.x1-d.x0),h:Math.abs(d.y1-d.y0),text:"",font:toolSettings.fontFamily,size:toolSettings.fontSize,bold:false,italic:false,color});
+    else if(d.type==="textbox"&&(Math.abs(d.x1-d.x0)>20||Math.abs(d.y1-d.y0)>20)){
+      const id=uid();
+      commit({id,page:pg,type:"textbox",x:Math.min(d.x0,d.x1),y:Math.min(d.y0,d.y1),w:Math.abs(d.x1-d.x0),h:Math.abs(d.y1-d.y0),text:"",font:toolSettings.fontFamily,size:toolSettings.fontSize,bold:false,italic:false,color,bg:"transparent"});
+      setSelected(id);setAutoEditId(id);setActiveTool(null);
+    }
     setDrawing(null);drawingRef.current=null;
   },[curPage,color,strokeWidth,highlightColor,toolSettings,setAnns]);
 
@@ -708,6 +980,14 @@ export default function PDFEditor(){
   const deleteAnnot=useCallback(id=>{setAnns(p=>p.filter(a=>a.id!==id));if(selected===id)setSelected(null);},[selected,setAnns]);
   const handleDone=()=>{setActiveTool(null);setSelected(null);setDrawing(null);drawingRef.current=null;};
 
+  // update a single annotation
+  const updateAnnot=useCallback((patch)=>{
+    const next=annRef.current.map(a=>a.id===patch.id?patch:a);
+    annRef.current=next;history.patch(next);
+    // trigger re-render
+    setAnns(next,false);
+  },[history,setAnns]);
+
   // ── save pdf ──────────────────────────────────────────────────────────────
   const savePDF=async()=>{
     if(!pdfBytes||!window.PDFLib)return;
@@ -734,12 +1014,13 @@ export default function PDFEditor(){
         const toX=v=>v/RS,toY=v=>pH-v/RS;
         switch(a.type){
           case "text":case "check":case "cross":case "date":{
+            if(!a.text)break;
             const f=await getF(a);
             pg.drawText(a.text,{x:toX(a.x),y:toY(a.y)-a.size*0.15,size:a.size,font:f,color:pc(a.color)});break;
           }
           case "textbox":{
             pg.drawRectangle({x:toX(a.x),y:toY(a.y+a.h),width:a.w/RS,height:a.h/RS,borderColor:pc(a.color||"#000"),borderWidth:1,color:rgb(1,1,1),opacity:0.01,borderOpacity:0.8});
-            if(a.text){const f=await getF({font:"Helvetica",bold:false,italic:false});const fs=a.size||12;a.text.split("\n").forEach((l,li)=>{if(l)pg.drawText(l,{x:toX(a.x)+4,y:toY(a.y)-fs*(li+1.2),size:fs,font:f,color:rgb(0.1,0.1,0.1)});});}
+            if(a.text){const f=await getF({font:"Helvetica",bold:a.bold,italic:a.italic});const fs=a.size||12;a.text.split("\n").forEach((l,li)=>{if(l)pg.drawText(l,{x:toX(a.x)+4,y:toY(a.y)-fs*(li+1.2),size:fs,font:f,color:rgb(0.1,0.1,0.1)});});}
             break;
           }
           case "sticky":{
@@ -811,23 +1092,27 @@ export default function PDFEditor(){
     finally{setSaving(false);}
   };
 
-  const getCursor=()=>{if(!activeTool)return"default";if(activeTool==="erase")return"not-allowed";if(activeTool==="edittext")return"text";return"crosshair";};
+  const getCursor=()=>{if(!activeTool)return"default";if(activeTool==="erase")return"not-allowed";return"crosshair";};
   const pageImg=pageImages[curPage];
+  const selectedAnn=annotations.find(a=>a.id===selected&&a.page===curPage)||null;
+
+  // light theme button border helper
+  const lightBorder=!T.isDark?{border:`1px solid ${T.border}`}:{};
 
   return(
-    <div style={{fontFamily:"'DM Sans',sans-serif",background:"#0e0e16",height:"100dvh",display:"flex",flexDirection:"column",color:"#e8e6f0",overflow:"hidden"}}
-      onMouseMove={e=>{if(drawingRef.current)onStagePM(e);}}
-      onMouseUp={e=>{if(drawingRef.current)onStagePU(e);}}>
+    <div style={{fontFamily:"'DM Sans',sans-serif",background:T.bg,height:"100dvh",display:"flex",flexDirection:"column",color:T.text,overflow:"hidden"}}
+      onPointerMove={e=>{if(drawingRef.current)onStagePM(e);}}
+      onPointerUp={e=>{if(drawingRef.current)onStagePU(e);}}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet"/>
 
       {/* TOP BAR */}
-      <div style={{background:"#12121b",borderBottom:"1px solid #1e1e2e",height:46,flexShrink:0,display:"flex",alignItems:"center",paddingLeft:14,paddingRight:14,gap:10}}>
-        <span style={{fontFamily:"'Space Mono',monospace",fontSize:13,fontWeight:700,color:"#e94560",letterSpacing:-0.5,flexShrink:0}}>PDF•FILL</span>
-        {pdfDoc&&<span style={{fontSize:12,color:"#444",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{fileName}</span>}
+      <div style={{background:T.bgSub,borderBottom:`1px solid ${T.border}`,height:46,flexShrink:0,display:"flex",alignItems:"center",paddingLeft:14,paddingRight:14,gap:10}}>
+        <span style={{fontFamily:"'Space Mono',monospace",fontSize:13,fontWeight:700,color:T.accent,letterSpacing:-0.5,flexShrink:0}}>PDF•FILL</span>
+        {pdfDoc&&<span style={{fontSize:12,color:T.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{fileName}</span>}
         <div style={{display:"flex",gap:6,marginLeft:"auto",flexShrink:0}}>
-          <TBtn onClick={history.undo} disabled={!history.canUndo}><I.Undo/></TBtn>
-          <TBtn onClick={history.redo} disabled={!history.canRedo}><I.Redo/></TBtn>
-          {pdfBytes&&<TBtn onClick={savePDF} disabled={saving} accent="#2ecc71"><I.Save/></TBtn>}
+          <TBtn onClick={history.undo} disabled={!history.canUndo} T={T}><I.Undo/></TBtn>
+          <TBtn onClick={history.redo} disabled={!history.canRedo} T={T}><I.Redo/></TBtn>
+          {pdfBytes&&<TBtn onClick={savePDF} disabled={saving} accent="#2ecc71" T={T}><I.Save/></TBtn>}
         </div>
       </div>
 
@@ -835,16 +1120,16 @@ export default function PDFEditor(){
       <div ref={vpRef} style={{flex:1,overflow:"hidden",position:"relative",touchAction:"none",cursor:getCursor()}}>
         {loading&&(
           <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <span style={{color:"#e94560",fontFamily:"'Space Mono',monospace",fontSize:14}}>Loading…</span>
+            <span style={{color:T.accent,fontFamily:"'Space Mono',monospace",fontSize:14}}>Loading…</span>
           </div>
         )}
         {!pdfBytes&&!loading&&(
           <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
             <div style={{textAlign:"center"}}>
               <div style={{fontSize:52,marginBottom:12}}>📄</div>
-              <div style={{color:"#e94560",fontFamily:"'Space Mono',monospace",fontSize:18,marginBottom:6}}>PDF FILLER</div>
-              <div style={{color:"#444",fontSize:13,marginBottom:20}}>Open a PDF to start annotating</div>
-              <button onClick={()=>fileRef.current?.click()} style={{background:"#e94560",color:"#fff",border:"none",borderRadius:10,padding:"11px 24px",fontSize:14,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>
+              <div style={{color:T.accent,fontFamily:"'Space Mono',monospace",fontSize:18,marginBottom:6}}>PDF FILLER</div>
+              <div style={{color:T.textMuted,fontSize:13,marginBottom:20}}>Open a PDF to start annotating</div>
+              <button onClick={()=>fileRef.current?.click()} style={{background:T.accent,color:"#fff",border:"none",borderRadius:10,padding:"11px 24px",fontSize:14,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>
                 ⊕ Open PDF File
               </button>
             </div>
@@ -853,11 +1138,11 @@ export default function PDFEditor(){
 
         {/* Thumbnails */}
         {pageImages.length>1&&(
-          <div style={{position:"absolute",left:0,top:0,bottom:0,width:60,background:"#0a0a12",borderRight:"1px solid #1e1e2e",overflowY:"auto",padding:"6px 4px",display:"flex",flexDirection:"column",gap:4,zIndex:30}}>
+          <div style={{position:"absolute",left:0,top:0,bottom:0,width:60,background:T.bgSub,borderRight:`1px solid ${T.border}`,overflowY:"auto",padding:"6px 4px",display:"flex",flexDirection:"column",gap:4,zIndex:30}}>
             {pageImages.map((img,i)=>(
-              <div key={i} onClick={()=>setCurPage(i)} style={{border:i===curPage?"2px solid #e94560":"2px solid #1e1e2e",borderRadius:4,overflow:"hidden",cursor:"pointer",opacity:i===curPage?1:0.5}}>
+              <div key={i} onClick={()=>setCurPage(i)} style={{border:i===curPage?`2px solid ${T.accent}`:`2px solid ${T.border}`,borderRadius:4,overflow:"hidden",cursor:"pointer",opacity:i===curPage?1:0.5}}>
                 <img src={img.dataUrl} style={{width:"100%",display:"block"}}/>
-                <div style={{textAlign:"center",fontSize:9,color:"#444",padding:"1px 0"}}>{i+1}</div>
+                <div style={{textAlign:"center",fontSize:9,color:T.textMuted,padding:"1px 0"}}>{i+1}</div>
               </div>
             ))}
           </div>
@@ -868,46 +1153,60 @@ export default function PDFEditor(){
           <div style={{position:"absolute",top:0,left:0,transformOrigin:"0 0",transform:`translate(${pan.x}px,${pan.y}px) scale(${zoom})`,willChange:"transform"}}>
             <div ref={stageRef}
               style={{position:"relative",width:pageImg.width,height:pageImg.height,boxShadow:"0 8px 40px #000b",borderRadius:3,overflow:"hidden",userSelect:"none"}}
-              onPointerDown={onStagePD} onPointerMove={onStagePM} onPointerUp={onStagePU}
+              onPointerDown={onStagePD}
               onClick={e=>{if((e.target===stageRef.current||e.target===stageRef.current?.firstChild)&&!activeTool)setSelected(null);}}>
               <img src={pageImg.dataUrl} style={{width:"100%",height:"100%",display:"block",pointerEvents:"none"}}/>
 
               {/* SVG overlay */}
               <svg width={pageImg.width} height={pageImg.height}
                 style={{position:"absolute",top:0,left:0,overflow:"visible",pointerEvents:activeTool==="erase"?"none":"all"}}>
-                {annotations.filter(a=>a.page===curPage&&["draw","line","arrow","circle","highlight","blackout","sign","initials"].includes(a.type))
-                  .map(a=>renderSVGAnnot(a,selected,setSelected,deleteAnnot,activeTool))}
-                <LivePreview drawing={drawing} color={color} strokeWidth={strokeWidth} highlightColor={highlightColor}/>
-              </svg>
-
-              {/* HTML annotations */}
-              {annotations.filter(a=>a.page===curPage&&["text","check","cross","date","textbox","sticky","image"].includes(a.type))
-                .map(a=>(
-                  <DraggableAnnot key={a.id} ann={a} selected={selected} activeTool={activeTool}
-                    zoomRef={zoomRef} panRef={panRef} stageRef={stageRef} annotationsRef={annRef}
+                {annotations.filter(a=>a.page===curPage&&SVG_TYPES.has(a.type)).map(a=>(
+                  <SVGAnnotComp key={a.id} a={a} selected={selected} activeTool={activeTool}
+                    zoomRef={zoomRef} stageRef={stageRef} annotationsRef={annRef}
                     onSelect={setSelected} onDelete={deleteAnnot}
                     onUpdate={next=>{annRef.current=next;history.patch(next);}}
                     historyPush={history.push} historyPatch={history.patch}/>
                 ))}
+                <LivePreview drawing={drawing} color={color} strokeWidth={strokeWidth} highlightColor={highlightColor}/>
+              </svg>
+
+              {/* HTML annotations */}
+              {annotations.filter(a=>a.page===curPage&&HTML_TYPES.has(a.type)).map(a=>(
+                <DraggableAnnot key={a.id} ann={a} selected={selected} activeTool={activeTool}
+                  zoomRef={zoomRef} panRef={panRef} stageRef={stageRef} annotationsRef={annRef}
+                  onSelect={setSelected} onDelete={deleteAnnot}
+                  autoEdit={autoEditId===a.id}
+                  onAutoEditDone={()=>setAutoEditId(null)}
+                  onUpdate={next=>{annRef.current=next;history.patch(next);}}
+                  historyPush={history.push} historyPatch={history.patch}/>
+              ))}
             </div>
           </div>
         )}
       </div>
 
+      {/* SELECTED OBJECT BAR */}
+      <ObjectBar ann={selectedAnn} T={T}
+        onUpdate={updateAnnot}
+        onDelete={deleteAnnot}/>
+
       {/* TOOL SETTINGS BAR */}
-      <ToolSettingsBar activeTool={activeTool} settings={toolSettings} onSettings={setToolSettings}
+      {!selectedAnn&&<ToolSettingsBar activeTool={activeTool} settings={toolSettings} onSettings={setToolSettings}
         color={color} onColor={setColor} strokeWidth={strokeWidth} onStrokeWidth={setStrokeWidth}
-        highlightColor={highlightColor} onHighlightColor={setHighlightColor}/>
+        highlightColor={highlightColor} onHighlightColor={setHighlightColor} T={T}/>}
 
       {/* TOOL STRIP */}
-      <div style={{background:"#16161f",borderTop:"1px solid #222232",flexShrink:0}}>
+      <div style={{background:T.toolBg,borderTop:`1px solid ${T.border}`,flexShrink:0}}>
         <SwipeStrip style={{padding:"6px 8px",gap:2}}>
           {TOOLS.map(tool=>{
-            const active=activeTool===tool.id;
+            const isActive=activeTool===tool.id;
             return(
-              <button key={tool.id} onClick={()=>setActiveTool(active?null:tool.id)}
-                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"7px 9px",borderRadius:10,border:"none",cursor:"pointer",
-                  background:active?"#e94560":"transparent",color:active?"#fff":"#888",minWidth:52,flexShrink:0,
+              <button key={tool.id} onClick={()=>setActiveTool(isActive?null:tool.id)}
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"7px 9px",
+                  borderRadius:10,cursor:"pointer",minWidth:52,flexShrink:0,
+                  background:isActive?T.accent:"transparent",
+                  color:isActive?"#fff":T.textDim,
+                  border:(!T.isDark&&!isActive)?"1px solid "+T.border:"none",
                   transition:"background 0.15s,color 0.15s"}}>
                 <div style={{width:24,height:24,flexShrink:0}}><tool.Ic/></div>
                 <span style={{fontSize:9.5,whiteSpace:"nowrap",fontFamily:"'DM Sans',sans-serif",fontWeight:500,letterSpacing:0.2}}>{tool.label}</span>
@@ -916,28 +1215,31 @@ export default function PDFEditor(){
           })}
         </SwipeStrip>
 
-        {/* ACTION BAR (hamburger + page nav + DONE) */}
+        {/* ACTION BAR */}
         <div style={{display:"flex",alignItems:"center",padding:"5px 10px 10px",gap:8}}>
-          <button onClick={()=>setShowMenu(true)} style={ST.iconBtn} title="Menu"><I.Menu/></button>
+          <button onClick={()=>setShowMenu(true)} style={{...mkIB(T),...lightBorder}} title="Menu"><I.Menu/></button>
 
-          {/* cursor / deselect mode indicator */}
           <button onClick={()=>{setActiveTool(null);setSelected(null);}} title="Select / move"
-            style={{...ST.iconBtn,color:activeTool?"#e94560":"#555",border:activeTool?"1.5px solid #e94560":"1.5px solid #222232",background:activeTool?"rgba(233,69,96,0.1)":"#0e0e16"}}>
+            style={{...mkIB(T),
+              color:activeTool?T.accent:T.textDim,
+              border:activeTool?`1.5px solid ${T.accent}`:`1px solid ${T.border}`,
+              background:activeTool?"rgba(233,69,96,0.1)":T.btnBg}}>
             <I.Cursor/>
           </button>
 
           {pageImages.length>1&&(
             <div style={{display:"flex",alignItems:"center",gap:4}}>
-              <button onClick={()=>setCurPage(p=>Math.max(0,p-1))}       disabled={curPage===0}                   style={{...ST.iconBtn,width:30}}><I.ChevL/></button>
-              <span style={{fontSize:11,color:"#555",fontFamily:"'Space Mono',monospace",whiteSpace:"nowrap"}}>{curPage+1}/{pageImages.length}</span>
-              <button onClick={()=>setCurPage(p=>Math.min(pageImages.length-1,p+1))} disabled={curPage>=pageImages.length-1} style={{...ST.iconBtn,width:30}}><I.ChevR/></button>
+              <button onClick={()=>setCurPage(p=>Math.max(0,p-1))} disabled={curPage===0} style={{...mkIB(T),width:30,...lightBorder}}><I.ChevL/></button>
+              <span style={{fontSize:11,color:T.textMuted,fontFamily:"'Space Mono',monospace",whiteSpace:"nowrap"}}>{curPage+1}/{pageImages.length}</span>
+              <button onClick={()=>setCurPage(p=>Math.min(pageImages.length-1,p+1))} disabled={curPage>=pageImages.length-1} style={{...mkIB(T),width:30,...lightBorder}}><I.ChevR/></button>
             </div>
           )}
 
           <button onClick={handleDone}
-            style={{flex:1,background:activeTool?"#e94560":"#1e1e2e",color:activeTool?"#fff":"#555",
-              border:activeTool?"none":"1px solid #222232",borderRadius:10,height:42,fontSize:15,fontWeight:700,
-              cursor:"pointer",fontFamily:"'DM Sans',sans-serif",transition:"background 0.18s,color 0.18s",letterSpacing:1}}>
+            style={{flex:1,background:activeTool?T.accent:T.bgCard,color:activeTool?"#fff":T.textMuted,
+              border:activeTool?"none":`1px solid ${T.border}`,borderRadius:10,height:42,
+              fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",
+              transition:"background 0.18s,color 0.18s",letterSpacing:1}}>
             DONE
           </button>
         </div>
@@ -946,27 +1248,24 @@ export default function PDFEditor(){
       <input ref={fileRef} type="file" accept=".pdf"    onChange={openFile}  style={{display:"none"}}/>
       <input ref={imgRef}  type="file" accept="image/*" onChange={onImgFile} style={{display:"none"}}/>
 
-      {signMode&&<SignaturePad title={signMode.type==="sign"?"Draw Signature":"Draw Initials"} isInitials={signMode.type==="initials"} onApply={applySign} onClose={()=>setSignMode(null)}/>}
+      {signMode&&<SignaturePad title={signMode.type==="sign"?"Draw Signature":"Draw Initials"} isInitials={signMode.type==="initials"} onApply={applySign} onClose={()=>setSignMode(null)} T={T}/>}
       {showMenu&&<HamburgerMenu onClose={()=>setShowMenu(false)} onOpen={()=>fileRef.current?.click()} onSave={savePDF}
         onUndo={history.undo} onRedo={history.redo} canUndo={history.canUndo} canRedo={history.canRedo}
         currentPage={curPage} totalPages={pageImages.length} onPageChange={setCurPage}
-        saving={saving} hasPdf={!!pdfBytes} onClearAll={()=>{setAnns([]);setSelected(null);}}/>}
+        saving={saving} hasPdf={!!pdfBytes} onClearAll={()=>{setAnns([]);setSelected(null);}}
+        theme={theme} onTheme={setTheme} T={T}/>}
     </div>
   );
 }
 
-// ─── shared micro-styles ──────────────────────────────────────────────────────
-const ST={
-  iconBtn:{width:38,height:42,display:"flex",alignItems:"center",justifyContent:"center",background:"#0e0e16",border:"1.5px solid #222232",borderRadius:8,cursor:"pointer",color:"#888",flexShrink:0,padding:0},
-  menuBtn:{background:"#1e1e2e",color:"#e8e6f0",border:"1px solid #2a2a3a",borderRadius:8,padding:"8px 14px",fontSize:13,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:500},
-  navBtn:{width:34,height:34,background:"#1e1e2e",border:"1px solid #2a2a3a",borderRadius:8,cursor:"pointer",color:"#a78bfa",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0},
-  sel:{background:"#1e1e2e",color:"#e8e6f0",border:"1px solid #2a2a3a",borderRadius:6,padding:"4px 7px",fontSize:11,fontFamily:"'DM Sans',sans-serif",cursor:"pointer",flexShrink:0},
-};
-
-function TBtn({children,onClick,disabled,accent="#a78bfa"}){
+// ─── TBtn (top bar icon button) ──────────────────────────────────────────────
+function TBtn({children,onClick,disabled,accent,T}){
+  const ac=accent||T.accent;
   return(
     <button onClick={onClick} disabled={disabled}
-      style={{width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",background:"#1e1e2e",border:`1px solid ${accent}33`,borderRadius:7,cursor:disabled?"default":"pointer",color:accent,opacity:disabled?0.3:1,padding:0,flexShrink:0}}>
+      style={{width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",
+        background:T.bgCard,border:`1px solid ${ac}33`,borderRadius:7,cursor:disabled?"default":"pointer",
+        color:ac,opacity:disabled?0.3:1,padding:0,flexShrink:0}}>
       <div style={{width:16,height:16}}>{children}</div>
     </button>
   );
