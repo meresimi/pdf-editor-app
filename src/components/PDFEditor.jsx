@@ -542,21 +542,20 @@ export default function PDFEditor() {
           )}
         </div>
 
-        {/* ── Properties panel — FIX: overlay on mobile, closable ──────────── */}
+        {/* ── Properties panel — bottom sheet ──────────────────────────────── */}
         {selBox && (
           <div style={{
-            position:"absolute", top:0, right:0, bottom:0,
-            width:200,
+            position:"absolute", left:0, right:0, bottom:0,
+            height:"20vh",
             background:"#10101a",
-            borderLeft:"1px solid #1e1e2e",
-            padding:12,
-            display:"flex", flexDirection:"column", gap:10,
-            overflowY:"auto",
+            borderTop:"1px solid #2a2a3a",
             zIndex:50,
-            boxShadow:"-4px 0 20px #000a",
+            boxShadow:"0 -4px 24px #000c",
+            display:"flex",
+            flexDirection:"column",
           }}>
-            {/* Header with close button */}
-            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+            {/* Drag handle + label + close */}
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 14px 4px",flexShrink:0 }}>
               <div style={{ fontFamily:"'Space Mono',monospace",fontSize:10,color:"#e94560",letterSpacing:1 }}>PROPERTIES</div>
               <button
                 onClick={()=>setSelected(null)}
@@ -564,39 +563,75 @@ export default function PDFEditor() {
                 title="Close">✕</button>
             </div>
 
-            <PropRow label="Text">
-              <textarea value={selBox.text}
-                onChange={e=>setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,text:e.target.value}:b))}
-                style={{ width:"100%",background:"#1e1e2e",border:"1px solid #2a2a3a",color:"#e8e6f0",borderRadius:4,padding:5,fontSize:12,resize:"vertical",fontFamily:"inherit",minHeight:52,boxSizing:"border-box" }} />
-            </PropRow>
-            <PropRow label="Font">
-              <select value={selBox.font} onChange={e=>{ setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,font:e.target.value}:b)); setFontFamily(e.target.value); }} style={{ ...selStyle,width:"100%" }}>
-                {FONTS.map(f=><option key={f}>{f}</option>)}
-              </select>
-            </PropRow>
-            <PropRow label="Size">
-              <FontSizeControl value={selBox.size} onChange={v=>{ setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,size:v}:b)); setFontSize(v); }} />
-            </PropRow>
-            <div style={{ display:"flex",gap:6 }}>
-              <Btn onClick={()=>{ const v=!selBox.bold;   setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,bold:v}:b));   setBold(v);   }} accent="#a78bfa" active={selBox.bold}   style={{ flex:1,fontWeight:700 }}>B</Btn>
-              <Btn onClick={()=>{ const v=!selBox.italic; setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,italic:v}:b)); setItalic(v); }} accent="#a78bfa" active={selBox.italic} style={{ flex:1,fontStyle:"italic" }}>I</Btn>
-            </div>
-            <PropRow label="Color">
-              <div style={{ display:"flex",flexWrap:"wrap",gap:4 }}>
-                {COLORS.map(c=>(
-                  <div key={c} onClick={()=>{ setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,color:c}:b)); setColor(c); }}
-                    style={{ width:18,height:18,borderRadius:3,background:c,cursor:"pointer",border:selBox.color===c?"2px solid #e94560":"2px solid #333" }} />
-                ))}
-                <input type="color" value={selBox.color}
-                  onChange={e=>{ setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,color:e.target.value}:b)); setColor(e.target.value); }}
-                  style={{ width:20,height:20,border:"none",background:"none",cursor:"pointer",padding:0 }} />
-              </div>
-            </PropRow>
-            <PropRow label="Position">
-              <span style={{ fontSize:11,color:"#555" }}>x:{Math.round(selBox.x)} y:{Math.round(selBox.y)}</span>
-            </PropRow>
-            <Btn onClick={copySelected}   accent="#a78bfa" style={{ fontSize:11 }}>⎘ Copy Box</Btn>
-            <Btn onClick={deleteSelected} accent="#ff6b6b" style={{ fontSize:11 }}>✕ Remove</Btn>
+            {/* Single horizontally scrollable row of all controls */}
+            <SwipeStrip style={{ flex:1,padding:"4px 14px 8px",gap:12,alignItems:"center" }}>
+
+              {/* Text input */}
+              <PropCol label="Text">
+                <textarea value={selBox.text}
+                  onChange={e=>setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,text:e.target.value}:b))}
+                  style={{ width:120,background:"#1e1e2e",border:"1px solid #2a2a3a",color:"#e8e6f0",borderRadius:4,padding:5,fontSize:12,resize:"none",fontFamily:"inherit",height:46,boxSizing:"border-box" }} />
+              </PropCol>
+
+              <VSep />
+
+              {/* Font */}
+              <PropCol label="Font">
+                <select value={selBox.font} onChange={e=>{ setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,font:e.target.value}:b)); setFontFamily(e.target.value); }} style={{ ...selStyle }}>
+                  {FONTS.map(f=><option key={f}>{f}</option>)}
+                </select>
+              </PropCol>
+
+              <VSep />
+
+              {/* Size */}
+              <PropCol label="Size">
+                <FontSizeControl value={selBox.size} onChange={v=>{ setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,size:v}:b)); setFontSize(v); }} />
+              </PropCol>
+
+              <VSep />
+
+              {/* Bold / Italic */}
+              <PropCol label="Style">
+                <div style={{ display:"flex",gap:5 }}>
+                  <Btn onClick={()=>{ const v=!selBox.bold;   setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,bold:v}:b));   setBold(v);   }} accent="#a78bfa" active={selBox.bold}   style={{ fontWeight:700,minWidth:32,padding:"4px 10px" }}>B</Btn>
+                  <Btn onClick={()=>{ const v=!selBox.italic; setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,italic:v}:b)); setItalic(v); }} accent="#a78bfa" active={selBox.italic} style={{ fontStyle:"italic",minWidth:32,padding:"4px 10px" }}>I</Btn>
+                </div>
+              </PropCol>
+
+              <VSep />
+
+              {/* Colors */}
+              <PropCol label="Color">
+                <div style={{ display:"flex",gap:4,alignItems:"center" }}>
+                  {COLORS.map(c=>(
+                    <div key={c} onClick={()=>{ setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,color:c}:b)); setColor(c); }}
+                      style={{ width:22,height:22,borderRadius:4,background:c,cursor:"pointer",flexShrink:0,border:selBox.color===c?"2px solid #e94560":"2px solid #2a2a3a" }} />
+                  ))}
+                  <input type="color" value={selBox.color}
+                    onChange={e=>{ setTextBoxes(prev=>prev.map(b=>b.id===selected?{...b,color:e.target.value}:b)); setColor(e.target.value); }}
+                    style={{ width:24,height:24,border:"none",background:"none",cursor:"pointer",padding:0,flexShrink:0 }} />
+                </div>
+              </PropCol>
+
+              <VSep />
+
+              {/* Position */}
+              <PropCol label="Position">
+                <span style={{ fontSize:11,color:"#777",whiteSpace:"nowrap",fontFamily:"'Space Mono',monospace" }}>x:{Math.round(selBox.x)} y:{Math.round(selBox.y)}</span>
+              </PropCol>
+
+              <VSep />
+
+              {/* Actions */}
+              <PropCol label="Actions">
+                <div style={{ display:"flex",gap:5 }}>
+                  <Btn onClick={copySelected}   accent="#a78bfa" style={{ fontSize:11,whiteSpace:"nowrap" }}>⎘ Copy</Btn>
+                  <Btn onClick={deleteSelected} accent="#ff6b6b" style={{ fontSize:11,whiteSpace:"nowrap" }}>✕ Remove</Btn>
+                </div>
+              </PropCol>
+
+            </SwipeStrip>
           </div>
         )}
       </div>
@@ -621,7 +656,7 @@ function TextBox({ box, selected, onSelect, onStartMouseDrag, onStartTouchDrag, 
 
   const base = {
     position:"absolute", left:box.x, top:box.y,
-    fontSize:box.size, fontFamily:box.font,
+    fontSize:box.size*RENDER_SCALE, fontFamily:box.font,
     fontWeight:box.bold?"bold":"normal", fontStyle:box.italic?"italic":"normal",
     color:box.color,
     border:selected?"1.5px dashed #e94560":"1.5px dashed transparent",
@@ -646,7 +681,7 @@ function TextBox({ box, selected, onSelect, onStartMouseDrag, onStartTouchDrag, 
       onChange={e=>onChange(e.target.value)}
       onBlur={()=>setEditing(false)}
       onKeyDown={e=>{ if(e.key==="Escape") setEditing(false); e.stopPropagation(); }}
-      style={{ ...base,cursor:"text",resize:"none",outline:"none",background:"rgba(233,69,96,0.08)",border:"1.5px solid #e94560",overflow:"hidden",minWidth:100,minHeight:box.size+10 }}
+      style={{ ...base,cursor:"text",resize:"none",outline:"none",background:"rgba(233,69,96,0.08)",border:"1.5px solid #e94560",overflow:"hidden",minWidth:100,minHeight:box.size*RENDER_SCALE+10 }}
     />
   );
 
@@ -684,3 +719,10 @@ const PropRow = ({ label, children }) => (
     {children}
   </div>
 );
+const PropCol = ({ label, children }) => (
+  <div style={{ display:"flex",flexDirection:"column",gap:4,flexShrink:0 }}>
+    <div style={{ fontSize:9,color:"#555",letterSpacing:0.5,textTransform:"uppercase",whiteSpace:"nowrap" }}>{label}</div>
+    {children}
+  </div>
+);
+const VSep = () => <div style={{ width:1,alignSelf:"stretch",background:"#2a2a3a",flexShrink:0,margin:"0 2px" }} />;
