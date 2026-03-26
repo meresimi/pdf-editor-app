@@ -110,6 +110,7 @@ export default function PDFEditor() {
   const [selected,   setSelected]   = useState(null);
   const [clipboard,  setClipboard]  = useState(null);
   const [addingText, setAddingText] = useState(false);
+  const [addingTick, setAddingTick] = useState(false);
 
   // FIX: dragging stored in a ref so touch handlers always see latest value
   // without needing to be recreated on every state change
@@ -295,17 +296,25 @@ export default function PDFEditor() {
     return()=>el.removeEventListener("wheel",handler);
   },[applyZoom]);
 
-  // ── Place text ────────────────────────────────────────────────────────────
-  const handleStageClick = useCallback((e)=>{
-    if(!addingText||!pageImages[currentPage]) return;
+  // ── Place text / tick ─────────────────────────────────────────────────────
+  const handleStageClick = useCallback((e)=>{\
+    if(!pageImages[currentPage]) return;
     const sr=stageRef.current.getBoundingClientRect();
     const x=(e.clientX-sr.left)/zoomRef.current;
     const y=(e.clientY-sr.top )/zoomRef.current;
+    if(addingTick){
+      const nb={id:uid(),x,y,page:currentPage,text:"✓",font:"Helvetica",size:fontSize,bold:true,italic:false,color:"#000000"};
+      setTextBoxes(prev=>[...prev,nb]);
+      setSelected(nb.id);
+      setAddingTick(false);
+      return;
+    }
+    if(!addingText) return;
     const nb={id:uid(),x,y,page:currentPage,text:"Text",font:fontFamily,size:fontSize,bold,italic,color};
     setTextBoxes(prev=>[...prev,nb]);
     setSelected(nb.id);
     setAddingText(false);
-  },[addingText,pageImages,currentPage,fontFamily,fontSize,bold,italic,color,setTextBoxes]);
+  },[addingText,addingTick,pageImages,currentPage,fontFamily,fontSize,bold,italic,color,setTextBoxes]);
 
   // Click on viewport background → deselect (closes properties panel)
   const handleViewportClick = useCallback((e)=>{
@@ -399,17 +408,32 @@ export default function PDFEditor() {
       }
       const bytes=await doc.save();
       const blob=new Blob([bytes],{type:"application/pdf"});
-      const outName=fileName.replace(/\.pdf$/i,"_edited.pdf");
+      const baseName=fileName.replace(/_filled(\.pdf)?$/i,"").replace(/\.pdf$/i,"");
+      const outName=`${baseName}_filled.pdf`;
+      // Try Capacitor (Android/iOS native)
+      let savedNatively=false;
       try{
         const {Filesystem,Directory}=await import("@capacitor/filesystem");
-        const {Share}=await import("@capacitor/share");
-        const b64=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(",")[1]); r.onerror=rej; r.readAsDataURL(blob); });
-        const result=await Filesystem.writeFile({path:outName,data:b64,directory:Directory.Documents});
-        await Share.share({title:outName,url:result.uri,dialogTitle:"Save or share PDF"});
-      }catch(_){
-        const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=outName; a.click();
+        const b64=await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result.split(",")[1]); fr.onerror=rej; fr.readAsDataURL(blob); });
+        await Filesystem.writeFile({path:outName,data:b64,directory:Directory.Downloads});
+        savedNatively=true;
+        try{
+          const {Share}=await import("@capacitor/share");
+          const uriResult=await Filesystem.getUri({path:outName,directory:Directory.Downloads});
+          await Share.share({title:outName,url:uriResult.uri,dialogTitle:"PDF saved – share or open"});
+        }catch(_){}
+      }catch(_){ savedNatively=false; }
+      // Web fallback
+      if(!savedNatively){
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement("a");
+        a.href=url; a.download=outName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(()=>{ URL.revokeObjectURL(url); document.body.removeChild(a); },1000);
       }
-    }finally{ setSaving(false); }
+    }catch(err){ console.error("Save failed",err); }
+    finally{ setSaving(false); }
   };
 
   const selBox  = textBoxes.find(b=>b.id===selected);
@@ -429,14 +453,17 @@ export default function PDFEditor() {
       {/* ══ TOP BAR ═══════════════════════════════════════════════════════════ */}
       <div style={{ background:"#16161f",borderBottom:"1px solid #2a2a3a",height:50,flexShrink:0,display:"flex",alignItems:"center" }}>
         <div style={{ flexShrink:0,padding:"0 14px",borderRight:"1px solid #2a2a3a",height:"100%",display:"flex",alignItems:"center" }}>
-          <span style={{ fontFamily:"'Space Mono',monospace",fontSize:14,fontWeight:700,color:"#e94560",letterSpacing:-0.5,whiteSpace:"nowrap" }}>PDF•ED</span>
+          <span style={{ fontFamily:"'Space Mono',monospace",fontSize:14,fontWeight:700,color:"#e94560",letterSpacing:-0.5,whiteSpace:"nowrap" }}>PDF•FILL</span>
         </div>
         <SwipeStrip style={{ flex:1,height:"100%",padding:"0 10px",gap:8 }}>
           <Btn onClick={()=>fileRef.current.click()} accent="#e94560">⊕ Open</Btn>
           <input ref={fileRef} type="file" accept=".pdf" onChange={openFile} style={{ display:"none" }} />
           <Div />
-          <Btn onClick={()=>setAddingText(t=>!t)} accent="#e94560" active={addingText}>
+          <Btn onClick={()=>{ setAddingText(t=>!t); setAddingTick(false); }} accent="#e94560" active={addingText}>
             {addingText?"✎ Tap page…":"✎ Add Text"}
+          </Btn>
+          <Btn onClick={()=>{ setAddingTick(t=>!t); setAddingText(false); }} accent="#2ecc71" active={addingTick}>
+            {addingTick?"✔ Tap page…":"✔ Add Tick"}
           </Btn>
           <Div />
           <Btn onClick={history.undo} disabled={!history.canUndo} accent="#a78bfa">↩ Undo</Btn>
@@ -500,7 +527,7 @@ export default function PDFEditor() {
         <div
           ref={viewportRef}
           onClick={handleViewportClick}
-          style={{ flex:1,overflow:"hidden",position:"relative",touchAction:"none",cursor:addingText?"crosshair":"default" }}
+          style={{ flex:1,overflow:"hidden",position:"relative",touchAction:"none",cursor:(addingText||addingTick)?"crosshair":"default" }}
         >
           {loading && (
             <div style={{ position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center" }}>
@@ -511,7 +538,7 @@ export default function PDFEditor() {
             <div style={{ position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center" }}>
               <div style={{ textAlign:"center" }}>
                 <div style={{ fontSize:52,marginBottom:12 }}>📄</div>
-                <div style={{ color:"#e94560",fontFamily:"'Space Mono',monospace",fontSize:20,marginBottom:6 }}>PDF EDITOR</div>
+                <div style={{ color:"#e94560",fontFamily:"'Space Mono',monospace",fontSize:20,marginBottom:6 }}>PDF FILLER</div>
                 <div style={{ color:"#444",fontSize:13,marginBottom:20 }}>Open a PDF to start annotating</div>
                 <button onClick={()=>fileRef.current.click()} style={{ background:"#e94560",color:"#fff",border:"none",borderRadius:8,padding:"10px 22px",fontSize:14,cursor:"pointer" }}>
                   ⊕ Open PDF File
