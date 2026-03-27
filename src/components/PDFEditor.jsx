@@ -227,8 +227,6 @@ function HamburgerMenu({onClose,onOpen,onSave,onUndo,onRedo,canUndo,canRedo,curr
           </MS>
 
           <MS label="EDIT" T={T}>
-            <MR icon={<I.Undo/>} label="Undo" onClick={()=>{onUndo();onClose();}} disabled={!canUndo} T={T}/>
-            <MR icon={<I.Redo/>} label="Redo" onClick={()=>{onRedo();onClose();}} disabled={!canRedo} T={T}/>
             <MR icon={<I.Trash/>} label="Clear all annotations" accent="#ff6b6b" onClick={()=>{onClearAll();onClose();}} disabled={!hasPdf} T={T}/>
           </MS>
 
@@ -491,17 +489,16 @@ function SVGAnnotComp({a,selected,activeTool,zoomRef,stageRef,annotationsRef,onS
     e.stopPropagation();
     if(activeTool==="erase"){onDelete(a.id);return;}
     onSelect(a.id);
-    if(!activeTool){
-      const src=e.touches?e.touches[0]:e;
-      const er=stageRef.current?.getBoundingClientRect();if(!er)return;
-      drag.current={lastX:(src.clientX-er.left)/zoomRef.current,lastY:(src.clientY-er.top)/zoomRef.current};
-      setIsDrag(true);
-    }
+    // allow drag regardless of active tool
+    const src=e.touches?e.touches[0]:e;
+    const er=stageRef.current?.getBoundingClientRect();if(!er)return;
+    drag.current={lastX:(src.clientX-er.left)/zoomRef.current,lastY:(src.clientY-er.top)/zoomRef.current};
+    setIsDrag(true);
   };
 
   const sel=selected===a.id;
   const cursor=activeTool==="erase"?"not-allowed":isDrag?"grabbing":"grab";
-  const commonEvts={onMouseDown:onDown,onTouchStart:onDown,style:{cursor}};
+  const commonEvts={onPointerDown:onDown,style:{cursor}};
   const op=isDrag?0.7:1;
 
   switch(a.type){
@@ -595,23 +592,37 @@ function DraggableAnnot({ann,selected,activeTool,zoomRef,stageRef,annotationsRef
   const drag=useRef(null);
   const [editing,setEditing]=useState(false);
   const [isDrag,setIsDrag]=useState(false);
+  const [editText,setEditText]=useState(""); // LOCAL state so textarea re-renders on keypress
   const inputRef=useRef(null);
+
+  // Sync local edit text when editing starts
+  useEffect(()=>{
+    if(editing){setEditText(ann.text||"");}
+  },[editing]); // eslint-disable-line
 
   // auto-enter edit mode when just placed
   useEffect(()=>{
     if(autoEdit){setEditing(true);onAutoEditDone();}
   },[autoEdit]); // eslint-disable-line
 
-  useEffect(()=>{if(editing&&inputRef.current){inputRef.current.focus();inputRef.current.select();}},[ editing]);
+  useEffect(()=>{
+    if(editing&&inputRef.current){
+      inputRef.current.focus();
+      // place cursor at end
+      const len=inputRef.current.value.length;
+      inputRef.current.setSelectionRange(len,len);
+    }
+  },[editing]);
 
-  // Always-on drag listeners — check drag.current inside
+  // Always-on drag listeners
   useEffect(()=>{
     const move=e=>{
       if(!drag.current)return;
       const src=e.touches?e.touches[0]:e;
       const er=stageRef.current?.getBoundingClientRect();if(!er)return;
-      const x=(src.clientX-er.left-drag.current.offX)/zoomRef.current;
-      const y=(src.clientY-er.top -drag.current.offY)/zoomRef.current;
+      // use stageRef bounding rect which already accounts for CSS transform
+      const x=(src.clientX-er.left)/zoomRef.current-drag.current.offX;
+      const y=(src.clientY-er.top)/zoomRef.current-drag.current.offY;
       const next=annotationsRef.current.map(a=>a.id===ann.id?{...a,x,y}:a);
       annotationsRef.current=next;historyPatch(next);onUpdate(next);
     };
@@ -621,7 +632,7 @@ function DraggableAnnot({ann,selected,activeTool,zoomRef,stageRef,annotationsRef
     };
     window.addEventListener("pointermove",move);
     window.addEventListener("pointerup",up);
-    window.addEventListener("touchmove",move,{passive:true});
+    window.addEventListener("touchmove",move,{passive:false});
     window.addEventListener("touchend",up);
     return()=>{
       window.removeEventListener("pointermove",move);
@@ -632,20 +643,24 @@ function DraggableAnnot({ann,selected,activeTool,zoomRef,stageRef,annotationsRef
   },[ann.id]); // eslint-disable-line
 
   const onDown=e=>{
+    if(editing)return; // let textarea handle its own events
     e.stopPropagation();
     if(activeTool==="erase"){onDelete(ann.id);return;}
     const wasSelected=selected===ann.id;
     onSelect(ann.id);
-    if(!activeTool){
-      // second tap on selected text → edit
-      if(wasSelected&&["text","textbox","sticky","date"].includes(ann.type)&&!["check","cross"].includes(ann.type)){
-        setEditing(true);return;
-      }
-      const src=e.touches?e.touches[0]:e;
-      const er=stageRef.current?.getBoundingClientRect();if(!er)return;
-      drag.current={offX:src.clientX-er.left-ann.x*zoomRef.current,offY:src.clientY-er.top-ann.y*zoomRef.current};
-      setIsDrag(true);
+    // double-tap on selected editable → enter edit mode
+    if(wasSelected&&["text","textbox","sticky"].includes(ann.type)){
+      setEditing(true);return;
     }
+    // start drag — works regardless of active tool
+    const src=e.touches?e.touches[0]:e;
+    const er=stageRef.current?.getBoundingClientRect();if(!er)return;
+    // offX/offY = annotation position in stage coords at drag start
+    drag.current={
+      offX:(src.clientX-er.left)/zoomRef.current-ann.x,
+      offY:(src.clientY-er.top)/zoomRef.current-ann.y,
+    };
+    setIsDrag(true);
   };
 
   const sel=selected===ann.id;
@@ -655,25 +670,31 @@ function DraggableAnnot({ann,selected,activeTool,zoomRef,stageRef,annotationsRef
     border:sel?"1.5px dashed #e94560":"1.5px dashed transparent",
     borderRadius:3,padding:"2px 4px",
     background:sel?"rgba(233,69,96,0.06)":"transparent",
-    cursor:activeTool==="erase"?"not-allowed":isDrag?"grabbing":"move",
+    cursor:activeTool==="erase"?"not-allowed":isDrag?"grabbing":"grab",
     userSelect:"none",touchAction:"none",zIndex:sel?20:10,
     opacity:isDrag?0.7:1,
-    boxShadow:isDrag?"0 8px 24px rgba(0,0,0,0.4)":"none",
-    transition:"opacity 0.1s,box-shadow 0.1s",
+    boxShadow:isDrag?"0 8px 24px rgba(0,0,0,0.35)":"none",
+    transition:"box-shadow 0.1s",
   };
 
+  // Textarea for editing — uses LOCAL state so every keystroke shows immediately
   const editArea=(valKey,extraStyle={})=>(
     <textarea ref={inputRef}
-      value={ann[valKey]||""}
-      placeholder={valKey==="text"?"Type here…":""}
-      onChange={e=>{
-        const next=annotationsRef.current.map(a=>a.id===ann.id?{...a,[valKey]:e.target.value}:a);
-        annotationsRef.current=next;onUpdate(next);
+      value={editText}
+      placeholder="Type here…"
+      onChange={e=>setEditText(e.target.value)}
+      onBlur={()=>{
+        // commit to annotation on blur
+        const next=annotationsRef.current.map(a=>a.id===ann.id?{...a,[valKey]:editText}:a);
+        annotationsRef.current=next;
+        historyPush(next);
+        setEditing(false);
       }}
-      onBlur={()=>{setEditing(false);historyPush(annotationsRef.current);}}
-      onKeyDown={e=>{if(e.key==="Escape")setEditing(false);e.stopPropagation();}}
+      onKeyDown={e=>{if(e.key==="Escape"){setEditing(false);}e.stopPropagation();}}
+      onPointerDown={e=>e.stopPropagation()}
+      onTouchStart={e=>e.stopPropagation()}
       style={{background:"rgba(233,69,96,0.08)",border:"1.5px solid #e94560",borderRadius:3,
-        padding:"2px 4px",resize:"none",outline:"none",...extraStyle}}/>
+        padding:"2px 4px",resize:"both",outline:"none",...extraStyle}}/>
   );
 
   const bgStyle=ann.bg&&ann.bg!=="transparent"?{background:ann.bg}:{};
@@ -686,9 +707,9 @@ function DraggableAnnot({ann,selected,activeTool,zoomRef,stageRef,annotationsRef
       <div style={{...base,...bgStyle,fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",
         fontWeight:ann.bold?"bold":"normal",fontStyle:ann.italic?"italic":"normal",
         color:ann.color,whiteSpace:"pre",lineHeight:1.2,minWidth:20}}
-        onMouseDown={onDown} onTouchStart={onDown}>
+        onPointerDown={onDown}>
         {editing&&!sym
-          ? editArea("text",{fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color,minWidth:100,minHeight:ann.size*RS+10})
+          ? editArea("text",{fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color,minWidth:120,minHeight:ann.size*RS+14})
           : placeholder
             ? <span style={{color:"#aaa",fontStyle:"italic",fontSize:ann.size*RS}}>Tap to type…</span>
             : displayText
@@ -701,12 +722,12 @@ function DraggableAnnot({ann,selected,activeTool,zoomRef,stageRef,annotationsRef
       <div style={{...base,...bgStyle,width:ann.w,minHeight:ann.h,
         border:sel?"1.5px solid #e94560":`1.5px solid ${ann.color||"#000"}`,
         background:bgStyle.background||"rgba(255,255,255,0.03)",padding:6}}
-        onMouseDown={onDown} onTouchStart={onDown}>
+        onPointerDown={onDown}>
         {editing
-          ? editArea("text",{width:"100%",minHeight:ann.h-12,fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color,border:"none",padding:0})
+          ? editArea("text",{width:"100%",minHeight:ann.h-12,fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color,fontWeight:ann.bold?"bold":"normal",fontStyle:ann.italic?"italic":"normal",border:"none",padding:0})
           : <span style={{fontSize:ann.size*RS,fontFamily:ann.font||"Helvetica",color:ann.color||"#000",
               fontWeight:ann.bold?"bold":"normal",fontStyle:ann.italic?"italic":"normal",whiteSpace:"pre-wrap"}}>
-              {ann.text||<span style={{color:"#888",fontStyle:"italic",fontSize:18}}>Tap to type…</span>}
+              {ann.text||<span style={{color:"#888",fontStyle:"italic",fontSize:18}}>Tap twice to type…</span>}
             </span>
         }
       </div>
@@ -717,12 +738,12 @@ function DraggableAnnot({ann,selected,activeTool,zoomRef,stageRef,annotationsRef
       <div style={{...base,width:ann.w,minHeight:ann.h,background:sel?"#FFF9C4":"#FFFDE7",
         border:sel?"1.5px solid #e94560":"1.5px solid #F9A825",borderRadius:6,
         boxShadow:"2px 3px 10px rgba(0,0,0,0.35)",padding:10}}
-        onMouseDown={onDown} onTouchStart={onDown}>
+        onPointerDown={onDown}>
         <div style={{fontSize:11,color:"#F57F17",marginBottom:5,fontWeight:700}}>NOTE</div>
         {editing
           ? editArea("text",{width:"100%",minHeight:60,background:"transparent",border:"none",color:"#333",fontSize:13})
           : <div style={{fontSize:13,color:"#333",whiteSpace:"pre-wrap"}}>
-              {ann.text||<span style={{color:"#bbb",fontStyle:"italic"}}>Tap to type…</span>}
+              {ann.text||<span style={{color:"#bbb",fontStyle:"italic"}}>Tap twice to type…</span>}
             </div>
         }
       </div>
@@ -731,7 +752,7 @@ function DraggableAnnot({ann,selected,activeTool,zoomRef,stageRef,annotationsRef
   if(ann.type==="image"){
     return(
       <div style={{...base,width:ann.w,height:ann.h,padding:0,overflow:"hidden",borderRadius:2}}
-        onMouseDown={onDown} onTouchStart={onDown}>
+        onPointerDown={onDown}>
         <img src={ann.dataUrl} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",pointerEvents:"none"}}/>
       </div>
     );
@@ -890,8 +911,11 @@ export default function PDFEditor(){
   },[applyZoom]);
 
   const getPageXY=useCallback(e=>{
-    const vr=vpRef.current.getBoundingClientRect();
-    return{x:(e.clientX-vr.left-panRef.current.x)/zoomRef.current,y:(e.clientY-vr.top-panRef.current.y)/zoomRef.current};
+    // stageRef.getBoundingClientRect() already accounts for CSS transform (pan+zoom)
+    // so we just divide by zoom to get unscaled stage coordinates
+    const sr=stageRef.current?.getBoundingClientRect();
+    if(!sr)return{x:0,y:0};
+    return{x:(e.clientX-sr.left)/zoomRef.current,y:(e.clientY-sr.top)/zoomRef.current};
   },[]);
 
   // ── stage pointer down ────────────────────────────────────────────────────
@@ -980,13 +1004,12 @@ export default function PDFEditor(){
   const deleteAnnot=useCallback(id=>{setAnns(p=>p.filter(a=>a.id!==id));if(selected===id)setSelected(null);},[selected,setAnns]);
   const handleDone=()=>{setActiveTool(null);setSelected(null);setDrawing(null);drawingRef.current=null;};
 
-  // update a single annotation
+  // update a single annotation — history.push triggers setIdx → re-render
   const updateAnnot=useCallback((patch)=>{
     const next=annRef.current.map(a=>a.id===patch.id?patch:a);
-    annRef.current=next;history.patch(next);
-    // trigger re-render
-    setAnns(next,false);
-  },[history,setAnns]);
+    annRef.current=next;
+    history.push(next);
+  },[history]);
 
   // ── save pdf ──────────────────────────────────────────────────────────────
   const savePDF=async()=>{
@@ -1110,8 +1133,6 @@ export default function PDFEditor(){
         <span style={{fontFamily:"'Space Mono',monospace",fontSize:13,fontWeight:700,color:T.accent,letterSpacing:-0.5,flexShrink:0}}>PDF•FILL</span>
         {pdfDoc&&<span style={{fontSize:12,color:T.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{fileName}</span>}
         <div style={{display:"flex",gap:6,marginLeft:"auto",flexShrink:0}}>
-          <TBtn onClick={history.undo} disabled={!history.canUndo} T={T}><I.Undo/></TBtn>
-          <TBtn onClick={history.redo} disabled={!history.canRedo} T={T}><I.Redo/></TBtn>
           {pdfBytes&&<TBtn onClick={savePDF} disabled={saving} accent="#2ecc71" T={T}><I.Save/></TBtn>}
         </div>
       </div>
@@ -1150,7 +1171,7 @@ export default function PDFEditor(){
 
         {/* Stage */}
         {pageImg&&!loading&&(
-          <div style={{position:"absolute",top:0,left:0,transformOrigin:"0 0",transform:`translate(${pan.x}px,${pan.y}px) scale(${zoom})`,willChange:"transform"}}>
+          <div style={{position:"absolute",top:0,left:0,transformOrigin:"0 0",transform:`translate(${pan.x}px,${pan.y}px) scale(${zoom})`,willChange:"transform",touchAction:"none"}}>
             <div ref={stageRef}
               style={{position:"relative",width:pageImg.width,height:pageImg.height,boxShadow:"0 8px 40px #000b",borderRadius:3,overflow:"hidden",userSelect:"none"}}
               onPointerDown={onStagePD}
@@ -1219,12 +1240,13 @@ export default function PDFEditor(){
         <div style={{display:"flex",alignItems:"center",padding:"5px 10px 10px",gap:8}}>
           <button onClick={()=>setShowMenu(true)} style={{...mkIB(T),...lightBorder}} title="Menu"><I.Menu/></button>
 
-          <button onClick={()=>{setActiveTool(null);setSelected(null);}} title="Select / move"
-            style={{...mkIB(T),
-              color:activeTool?T.accent:T.textDim,
-              border:activeTool?`1.5px solid ${T.accent}`:`1px solid ${T.border}`,
-              background:activeTool?"rgba(233,69,96,0.1)":T.btnBg}}>
-            <I.Cursor/>
+          <button onClick={history.undo} disabled={!history.canUndo} title="Undo"
+            style={{...mkIB(T),...lightBorder,opacity:history.canUndo?1:0.3}}>
+            <I.Undo/>
+          </button>
+          <button onClick={history.redo} disabled={!history.canRedo} title="Redo"
+            style={{...mkIB(T),...lightBorder,opacity:history.canRedo?1:0.3}}>
+            <I.Redo/>
           </button>
 
           {pageImages.length>1&&(
